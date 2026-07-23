@@ -342,3 +342,23 @@ Agent 5 已作为独立 n8n 工作流创建：
 5. 只把 `ready_for_agent6 = true` 的配音字幕包交给未来 Agent 6。
 
 当前不要开发 Agent 6。
+
+## Agent 6 Publishing Package & Analytics v0.1 DEV
+
+Agent 6 已作为独立 n8n 工作流创建：
+
+```text
+06-Publishing-Package-Analytics/n8n/ai-health-os-agent6-publishing-package-analytics-v0.1-dev.json
+```
+
+它使用 n8n 官方 Form Trigger、Code 和 Form Ending 节点，不写磁盘，不调用本地 Python，不连接发布平台，不自动上传，不购买广告，不自动回复评论。
+
+使用顺序：
+
+1. 导入工作流 `AI Health OS - Agent 6 Publishing Package & Analytics v0.1 DEV`；
+2. 在第 1 个节点粘贴 Agent 5 输出 JSON；
+3. 逐节点测试到第 7 个节点；
+4. 查看 Markdown Publishing Package & Analytics Report；
+5. 人工确认后再决定是否手动发布。
+
+当前不要开发 Agent 7。

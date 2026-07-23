@@ -215,3 +215,42 @@ Agent 5 不负责：
 6. 只把 `ready_for_agent6 = true` 的配音字幕包交给未来 Agent 6。
 
 当前阶段请不要开发 Agent 6。
+
+## 10. 下一步如何使用 Agent 6？
+
+Agent 6 Publishing Package & Analytics v0.1 DEV 已创建为独立 n8n 工作流。
+
+但请注意：Workflow Manager 当前主流程仍然只自动运行 Agent 1。Agent 6 只是登记了接口，不会自动接在 Agent 5 后面运行。
+
+Agent 6 负责：
+
+- 接收 Agent 5 中 `ready_for_agent6 = true` 的内容；
+- 生成 TikTok / Instagram / YouTube Shorts Caption；
+- 生成 Video Title、Cover Text、CTA、Hashtags 和 SEO Keywords；
+- 生成 Suggested Posting Time、Publishing Checklist、Analytics Template 和 A/B Test Plan；
+- 输出 JSON 和 Markdown 报告。
+
+Agent 6 不负责：
+
+- 自动发布；
+- 自动上传；
+- 自动购买广告；
+- 自动回复评论；
+- 开发 Agent 7。
+
+导入文件：
+
+```text
+06-Publishing-Package-Analytics/n8n/ai-health-os-agent6-publishing-package-analytics-v0.1-dev.json
+```
+
+普通用户操作顺序：
+
+1. 先运行 Agent 5；
+2. 人工确认 Agent 5 生成的配音字幕包；
+3. 打开 Agent 6 n8n 表单；
+4. 粘贴 Agent 5 JSON；
+5. 查看 Agent 6 输出的 Markdown 报告；
+6. 人工确认后再决定是否手动发布。
+
+当前阶段请不要开发 Agent 7。

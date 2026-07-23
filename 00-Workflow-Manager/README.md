@@ -139,3 +139,17 @@ Agent 5 负责接收 Agent 4 中 `ready_for_agent5 = true` 的视觉方案，生
 Agent 5 不会被 Workflow Manager 自动触发。必须先人工确认 Agent 4 的视觉方案，再单独运行 Agent 5 n8n 工作流。
 
 当前不要开发 Agent 6。
+
+## Agent 6 v0.1 DEV 预留说明
+
+Agent 6 Publishing Package & Analytics v0.1 DEV 已创建为独立 n8n 工作流，并已在 Workflow Manager 中登记接口。
+
+导入文件：
+
+```text
+06-Publishing-Package-Analytics/n8n/ai-health-os-agent6-publishing-package-analytics-v0.1-dev.json
+```
+
+Agent 6 负责接收 Agent 5 中 `ready_for_agent6 = true` 的内容，生成多平台 Caption、Video Title、Cover Text、CTA、Hashtags、SEO Keywords、Suggested Posting Time、Publishing Checklist、Analytics Template 和 A/B Test Plan。
+
+Agent 6 不会自动发布、上传、购买广告或回复评论。当前不要开发 Agent 7。
