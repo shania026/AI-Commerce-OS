@@ -1,0 +1,210 @@
+{
+  "name": "AI Health OS - Daily Topic Finder Docker Files",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "AI Health OS 每日健康选题",
+        "formDescription": "上传当天健康选题 CSV。新版使用 n8n Docker 推荐挂载目录 /files：上传 CSV 保存到 /files/health_topics.csv，JSON 保存到 /files/agent1_ranked_health_topics.json，Markdown 保存到 /files/agent1_decision_report.md。Code 节点只做数据处理，不使用 fs。",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "health_topics_csv",
+              "fieldType": "file",
+              "requiredField": true,
+              "acceptFileTypes": ".csv"
+            },
+            {
+              "fieldLabel": "today_limit",
+              "fieldType": "number",
+              "placeholder": "5",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "today_focus",
+              "fieldType": "textarea",
+              "placeholder": "例如：今天重点分析 Rooibos、无咖啡因晚间饮品、南非草本故事。",
+              "requiredField": false
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "path": "ai-health-os-daily-topic-finder-files"
+        }
+      },
+      "id": "4b3170db-9d2b-4ef3-97c9-3eb7d6a3c9d1",
+      "name": "1. 上传健康选题 CSV",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -1320,
+        120
+      ],
+      "webhookId": "ai-health-os-daily-topic-finder-files"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 作用：只整理上传文件，不操作文件系统。\n// Code 节点不使用 fs、不创建目录、不读写本地文件。\nconst item = $input.first();\nconst binary = item.binary || {};\nconst firstBinaryKey = Object.keys(binary)[0];\n\nif (!firstBinaryKey) {\n  throw new Error('没有收到 CSV 文件。请在表单的 health_topics_csv 字段上传 .csv 文件。');\n}\n\nconst limitFromForm = Number(item.json.today_limit || 5);\nconst safeLimit = Number.isFinite(limitFromForm) && limitFromForm > 0 ? Math.floor(limitFromForm) : 5;\n\nreturn [{\n  json: {\n    today_limit: safeLimit,\n    today_focus: item.json.today_focus || '',\n    input_file_name: '/files/health_topics.csv',\n    json_output_file_name: '/files/agent1_ranked_health_topics.json',\n    markdown_report_file_name: '/files/agent1_decision_report.md'\n  },\n  binary: {\n    data: binary[firstBinaryKey]\n  }\n}];"
+      },
+      "id": "f3a60e83-0b8d-4727-8cd4-c973375cc4dd",
+      "name": "2. 标准化上传文件",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1080,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/files/health_topics.csv",
+        "options": {
+          "dataPropertyName": "data"
+        }
+      },
+      "id": "c8bc8ed4-4311-4547-bd60-308360b748c7",
+      "name": "3. 保存上传 CSV 文件",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -840,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "data",
+        "options": {}
+      },
+      "id": "bb3e023c-3d6e-4c61-941f-c8ac0dbdb4ff",
+      "name": "4. 提取 CSV 文本",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -600,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 作用：只做数据处理：解析 CSV、评分、生成 JSON 文本和 Markdown 文本。\n// 严格不使用 fs、node:fs，也不创建目录、不读写本地文件。\nfunction getCsvText(item) {\n  if (typeof item.json.data === 'string') return item.json.data;\n  if (typeof item.json.text === 'string') return item.json.text;\n  if (typeof item.json.fileContent === 'string') return item.json.fileContent;\n  for (const value of Object.values(item.json)) {\n    if (typeof value === 'string' && value.includes('title') && value.includes('ingredient')) {\n      return value;\n    }\n  }\n  throw new Error('无法从 Extract From File 节点读取 CSV 文本。请确认上传的是 UTF-8 CSV 文件。');\n}\n\nfunction parseCsv(text) {\n  const rows = [];\n  let current = '';\n  let row = [];\n  let inQuotes = false;\n\n  for (let i = 0; i < text.length; i++) {\n    const char = text[i];\n    const next = text[i + 1];\n\n    if (char === '\"' && inQuotes && next === '\"') {\n      current += '\"';\n      i++;\n    } else if (char === '\"') {\n      inQuotes = !inQuotes;\n    } else if (char === ',' && !inQuotes) {\n      row.push(current);\n      current = '';\n    } else if ((char === '\\n' || char === '\\r') && !inQuotes) {\n      if (char === '\\r' && next === '\\n') i++;\n      row.push(current);\n      if (row.some((value) => value.trim() !== '')) rows.push(row);\n      row = [];\n      current = '';\n    } else {\n      current += char;\n    }\n  }\n\n  row.push(current);\n  if (row.some((value) => value.trim() !== '')) rows.push(row);\n  return rows;\n}\n\nfunction clampScore(value) {\n  const number = Number(value);\n  if (!Number.isFinite(number)) return 1;\n  return Math.max(1, Math.min(5, Math.round(number)));\n}\n\nfunction escapeRegex(word) {\n  return word.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\n}\n\nfunction containsWord(text, word) {\n  return new RegExp('(^|[^a-zA-Z])' + escapeRegex(word) + '($|[^a-zA-Z])', 'i').test(text);\n}\n\nfunction riskInfo(topic) {\n  const combined = [topic.title, topic.ingredient, topic.angle, topic.target_audience, topic.suggested_hook].join(' ');\n  const highRiskWords = ['cure', 'cures', 'treat', 'treats', 'treatment', 'prevent', 'prevents', 'reverse', 'reverses', 'diabetes', 'cancer', 'hypertension'];\n  const lowRiskWords = ['tea', 'caffeine', 'routine', 'evening routine', 'screen fatigue'];\n  const highHits = highRiskWords.filter((word) => containsWord(combined, word));\n  const lowHits = lowRiskWords.filter((word) => combined.toLowerCase().includes(word.toLowerCase()));\n\n  if (highHits.length > 0) {\n    return { score: 5, alerts: ['包含高风险健康词：' + highHits.join(', ') + '。发布前必须人工改写。'], status: 'needs_compliance_rewrite' };\n  }\n  if (lowHits.length > 0) {\n    return { score: 2, alerts: ['偏日常健康习惯，命中低风险方向：' + lowHits.join(', ') + '。'], status: 'approved_for_script' };\n  }\n  return { score: 1, alerts: ['未发现明显高风险词，但仍需人工确认。'], status: 'approved_for_script' };\n}\n\nfunction grade(score) {\n  if (score >= 25) return 'A';\n  if (score >= 20) return 'B';\n  return 'C';\n}\n\nfunction priority(item) {\n  if (item.recommendation_grade === 'A' && item.is_recommended_for_production === 'Yes') return '立即制作';\n  if (item.recommendation_grade === 'B' && item.is_recommended_for_production === 'Yes') return '观察';\n  return '暂缓';\n}\n\nconst sourceItem = $input.first();\nconst setup = $('2. 标准化上传文件').item.json;\nconst limit = Number(setup.today_limit || 5);\nconst csvText = getCsvText(sourceItem).replace(/^\\uFEFF/, '');\nconst rows = parseCsv(csvText);\n\nif (rows.length < 2) {\n  throw new Error('CSV 至少需要 1 行表头和 1 行选题数据。');\n}\n\nconst headers = rows[0].map((header) => header.trim());\nconst required = ['title', 'ingredient', 'angle', 'target_audience', 'curiosity', 'pain', 'product_fit', 'visual_potential', 'repeatability', 'suggested_hook'];\nconst missing = required.filter((field) => !headers.includes(field));\nif (missing.length > 0) {\n  throw new Error('CSV 缺少必填字段：' + missing.join(', '));\n}\n\nconst topics = rows.slice(1).map((values, index) => {\n  const topic = {};\n  headers.forEach((header, i) => { topic[header] = values[i] || ''; });\n  const scores = {\n    curiosity: clampScore(topic.curiosity),\n    pain: clampScore(topic.pain),\n    product_fit: clampScore(topic.product_fit),\n    visual_potential: clampScore(topic.visual_potential),\n    repeatability: clampScore(topic.repeatability)\n  };\n  const risk = riskInfo(topic);\n  const total = scores.curiosity * 2 + scores.pain * 2 + scores.product_fit + scores.visual_potential + scores.repeatability - risk.score * 2;\n  const recommendationGrade = grade(total);\n  const recommended = risk.score >= 5 ? 'No' : 'Yes';\n  const reason = recommended === 'No'\n    ? '暂不推荐直接制作《' + topic.title + '》，因为存在明显健康合规风险，应先人工改写。'\n    : recommendationGrade === 'A'\n      ? '推荐优先制作《' + topic.title + '》，因为它在好奇心、痛点强度、产品匹配度、画面表现力、系列化潜力上表现强，且风险可控。'\n      : '可以作为备选制作《' + topic.title + '》，它有一定潜力，但需要进一步优化钩子或商业角度。';\n\n  return {\n    row_number: index + 2,\n    title: topic.title,\n    ingredient: topic.ingredient,\n    angle: topic.angle,\n    target_audience: topic.target_audience,\n    total_score: total,\n    recommendation_grade: recommendationGrade,\n    is_recommended_for_production: recommended,\n    recommendation_reason: reason,\n    risk_score: risk.score,\n    risk_alerts: risk.alerts,\n    status: risk.status,\n    score_details: scores,\n    suggested_hook: topic.suggested_hook\n  };\n});\n\nconst ranked = topics.sort((a, b) => b.total_score - a.total_score).slice(0, limit);\nconst jsonText = JSON.stringify(ranked, null, 2);\n\nconst lines = [];\nlines.push('# Agent 1 V1.1 Decision Report：今日健康选题决策报告');\nlines.push('');\nlines.push('## 使用说明');\nlines.push('');\nlines.push('这份报告只用于决定今天优先制作哪些健康短视频选题。');\nlines.push('当前报告由 n8n 官方节点工作流生成；Code 节点只做数据处理，不操作文件系统，不开发 Agent 2。');\nlines.push('');\nlines.push('## 今日推荐 Top ' + ranked.length + ' 选题');\nlines.push('');\nlines.push('| 排名 | 选题 | 综合评分 | 推荐等级 | 推荐制作 | 建议优先级 |');\nlines.push('| --- | --- | ---: | --- | --- | --- |');\nranked.forEach((item, index) => {\n  lines.push('| ' + (index + 1) + ' | ' + item.title + ' | ' + item.total_score + ' | ' + item.recommendation_grade + ' | ' + item.is_recommended_for_production + ' | ' + priority(item) + ' |');\n});\nlines.push('');\nlines.push('## 单条选题决策详情');\nranked.forEach((item, index) => {\n  lines.push('');\n  lines.push('### ' + (index + 1) + '. ' + item.title);\n  lines.push('');\n  lines.push('- 综合评分：' + item.total_score);\n  lines.push('- 推荐等级：' + item.recommendation_grade);\n  lines.push('- 推荐制作：' + item.is_recommended_for_production);\n  lines.push('- 建议优先级：' + priority(item));\n  lines.push('- 推荐原因：' + item.recommendation_reason);\n  lines.push('- 风险提醒：' + item.risk_alerts.join('；'));\n});\nlines.push('');\nlines.push('## 下一步');\nlines.push('');\nlines.push('请先人工确认这份报告。确认前不要开发 Agent 2。');\nconst markdownText = lines.join('\\n');\n\nreturn [{\n  json: {\n    ranked_health_topics: ranked,\n    decision_report_markdown: markdownText,\n    json_output_file_name: setup.json_output_file_name,\n    markdown_report_file_name: setup.markdown_report_file_name\n  },\n  binary: {\n    json_file: {\n      data: Buffer.from(jsonText, 'utf8').toString('base64'),\n      mimeType: 'application/json',\n      fileName: setup.json_output_file_name\n    },\n    markdown_file: {\n      data: Buffer.from(markdownText, 'utf8').toString('base64'),\n      mimeType: 'text/markdown',\n      fileName: setup.markdown_report_file_name\n    }\n  }\n}];"
+      },
+      "id": "a3b98d5e-7f02-4d14-9b8e-e6ab9af7f7c3",
+      "name": "5. 评分并生成报告数据",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -360,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/files/agent1_ranked_health_topics.json",
+        "options": {
+          "dataPropertyName": "json_file"
+        }
+      },
+      "id": "19f3ef79-613a-4b7e-a24a-535c0cf92186",
+      "name": "6. 保存 JSON 排序结果",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/files/agent1_decision_report.md",
+        "options": {
+          "dataPropertyName": "markdown_file"
+        }
+      },
+      "id": "c85e8a60-b501-4d18-998b-9475a3074212",
+      "name": "7. 保存 Markdown 决策报告",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        -120,
+        240
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "1. 上传健康选题 CSV": {
+      "main": [
+        [
+          {
+            "node": "2. 标准化上传文件",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. 标准化上传文件": {
+      "main": [
+        [
+          {
+            "node": "3. 保存上传 CSV 文件",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. 保存上传 CSV 文件": {
+      "main": [
+        [
+          {
+            "node": "4. 提取 CSV 文本",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. 提取 CSV 文本": {
+      "main": [
+        [
+          {
+            "node": "5. 评分并生成报告数据",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. 评分并生成报告数据": {
+      "main": [
+        [
+          {
+            "node": "6. 保存 JSON 排序结果",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "7. 保存 Markdown 决策报告",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d8ff9b62-4500-4a44-ab1c-62c6f780a4c0",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}
