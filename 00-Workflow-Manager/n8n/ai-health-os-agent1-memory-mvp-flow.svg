@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520">
+  <rect width="1280" height="520" fill="#f8fafc"/>
+  <text x="40" y="50" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#0f172a">AI Health OS - Agent 1 Memory MVP</text>
+  <text x="40" y="82" font-family="Arial, sans-serif" font-size="16" fill="#475569">内存传递架构：不写磁盘、不使用 fs、不依赖 Python / Docker 文件路径</text>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <style>
+      .node { fill: #ffffff; stroke: #2563eb; stroke-width: 2; rx: 14; }
+      .branch { fill: #ffffff; stroke: #16a34a; stroke-width: 2; rx: 14; }
+      .end { fill: #ffffff; stroke: #f97316; stroke-width: 2; rx: 14; }
+      .title { font: 700 16px Arial, sans-serif; fill: #0f172a; }
+      .desc { font: 13px Arial, sans-serif; fill: #475569; }
+      .line { stroke: #334155; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect class="node" x="40" y="150" width="160" height="82" rx="14"/>
+  <text class="title" x="60" y="182">1. 上传 CSV</text>
+  <text class="desc" x="60" y="207">Form Trigger</text>
+
+  <path class="line" d="M 200 191 L 260 191"/>
+  <rect class="node" x="260" y="150" width="180" height="82" rx="14"/>
+  <text class="title" x="280" y="182">2. 标准化文件</text>
+  <text class="desc" x="280" y="207">Code: 只整理内存字段</text>
+
+  <path class="line" d="M 440 191 L 500 191"/>
+  <rect class="node" x="500" y="150" width="170" height="82" rx="14"/>
+  <text class="title" x="520" y="182">3. CSV 转 JSON</text>
+  <text class="desc" x="520" y="207">Extract From File</text>
+
+  <path class="line" d="M 670 191 L 730 191"/>
+  <rect class="node" x="730" y="150" width="190" height="82" rx="14"/>
+  <text class="title" x="750" y="182">4. Agent 1 分析</text>
+  <text class="desc" x="750" y="207">Code: 评分 + 风险判断</text>
+
+  <path class="line" d="M 920 180 C 975 130, 1015 128, 1060 128"/>
+  <rect class="branch" x="1060" y="88" width="180" height="82" rx="14"/>
+  <text class="title" x="1080" y="120">5. JSON 结果</text>
+  <text class="desc" x="1080" y="145">最终 JSON 分支</text>
+
+  <path class="line" d="M 920 205 C 970 245, 1015 255, 1060 255"/>
+  <rect class="branch" x="1060" y="215" width="180" height="82" rx="14"/>
+  <text class="title" x="1080" y="247">6. Markdown 报告</text>
+  <text class="desc" x="1080" y="272">产品经理阅读分支</text>
+
+  <path class="line" d="M 1150 297 L 1150 350"/>
+  <rect class="end" x="1060" y="350" width="180" height="82" rx="14"/>
+  <text class="title" x="1080" y="382">7. 显示结果</text>
+  <text class="desc" x="1080" y="407">Form Ending</text>
+</svg>
