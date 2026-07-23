@@ -110,7 +110,7 @@ Agent 2 V1.0 负责：
 - 完成健康声明风险检查；
 - 完成安全改写；
 - 输出 JSON 和 Markdown 报告；
-- 将可用选题交给未来 Agent 3。
+- 将可用选题交给 Agent 3。
 
 Agent 2 V1.0 不负责：
 
@@ -135,4 +135,42 @@ Agent 2 V1.0 不负责：
 6. 填写人工确认的选题名称或编号；
 7. 查看 Agent 2 输出的中文合规改写报告。
 
-当前阶段请不要开发 Agent 3。
+当前阶段请不要开发 Agent 5。
+
+## 8. 下一步如何使用 Agent 4？
+
+Agent 4 Visual Director v0.1 DEV 已创建为独立 n8n 工作流。
+
+但请注意：Workflow Manager 当前主流程仍然只自动运行 Agent 1。Agent 4 只是登记了接口，不会自动接在 Agent 3 后面运行。
+
+Agent 4 负责：
+
+- 接收 Agent 3 已通过 QA 的短视频脚本；
+- 生成 TikTok / Reels / Shorts 竖屏镜头规划；
+- 生成 AI 图片 Prompt 和 AI 视频 Prompt；
+- 输出 JSON Visual Plan 和 Markdown Visual Report；
+- 将可用视觉方案交给未来 Agent 5。
+
+Agent 4 不负责：
+
+- 实际生成图片或视频；
+- 配音；
+- 发布内容；
+- 开发 Agent 5。
+
+导入文件：
+
+```text
+04-Video-Director/n8n/ai-health-os-agent4-visual-director-v0.1-dev.json
+```
+
+普通用户操作顺序：
+
+1. 先运行 Agent 3；
+2. 人工确认 Agent 3 生成的脚本；
+3. 打开 Agent 4 n8n 表单；
+4. 粘贴 Agent 3 JSON；
+5. 查看 Agent 4 输出的 Markdown Visual Report；
+6. 只把 `ready_for_agent5 = true` 的视觉方案交给未来 Agent 5。
+
+当前阶段请不要开发 Agent 5。

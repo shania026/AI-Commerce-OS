@@ -93,7 +93,7 @@ Agent 2 V1.0 负责：
 - 完成健康声明风险检查；
 - 完成安全改写；
 - 输出 JSON 和 Markdown 报告；
-- 将可用选题交给未来 Agent 3。
+- 将可用选题交给 Agent 3。
 
 Agent 2 V1.0 不负责：
 
@@ -106,4 +106,20 @@ Agent 2 V1.0 不负责：
 
 当前主流程仍然只自动运行 Agent 1。
 
-请不要开发 Agent 3。
+请不要开发 Agent 5。
+
+## Agent 4 v0.1 DEV 预留说明
+
+Agent 4 Visual Director v0.1 DEV 已创建为独立 n8n 工作流，并已在 Workflow Manager 中登记接口。
+
+导入文件：
+
+```text
+04-Video-Director/n8n/ai-health-os-agent4-visual-director-v0.1-dev.json
+```
+
+Agent 4 负责接收 Agent 3 已通过 QA 的脚本，生成镜头规划、视觉执行方案、AI 图片 Prompt、AI 视频 Prompt 和 Markdown Visual Report。
+
+Agent 4 不会被 Workflow Manager 自动触发。必须先人工确认 Agent 3 的脚本，再单独运行 Agent 4 n8n 工作流。
+
+当前不要开发 Agent 5。

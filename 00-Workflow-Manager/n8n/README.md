@@ -302,3 +302,23 @@ Agent 2 V1.0 不负责：
 6. 提交后查看中文 Markdown 合规改写报告。
 
 重要说明：本工具仅用于内容风险筛查和谨慎改写，不构成医疗、法律或平台合规意见。最终发布前仍需人工审核。
+
+## Agent 4 Visual Director v0.1 DEV
+
+Agent 4 已作为独立 n8n 工作流创建：
+
+```text
+04-Video-Director/n8n/ai-health-os-agent4-visual-director-v0.1-dev.json
+```
+
+它使用 n8n 官方 Form Trigger、Code 和 Form Ending 节点，不写磁盘，不调用本地 Python，不依赖外部图片或视频 API。
+
+使用顺序：
+
+1. 导入工作流 `AI Health OS - Agent 4 Visual Director v0.1 DEV`；
+2. 在第 1 个节点粘贴 Agent 3 输出 JSON；
+3. 逐节点测试到第 7 个节点；
+4. 查看 Markdown Visual Report；
+5. 只把 `ready_for_agent5 = true` 的视觉方案交给未来 Agent 5。
+
+当前不要开发 Agent 5。
