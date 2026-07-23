@@ -13,7 +13,7 @@ spec.loader.exec_module(workflow_manager)
 
 
 class WorkflowManagerTest(unittest.TestCase):
-    """确认工作流管理器自动调度 Agent 1，并预留 Agent 2/3/4 人工交接点。"""
+    """确认工作流管理器自动调度 Agent 1，并预留 Agent 2/3/4/5 人工交接点。"""
 
     def test_agent1_is_registered(self):
         """当前 MVP 必须登记 Agent 1。"""
@@ -73,10 +73,34 @@ class WorkflowManagerTest(unittest.TestCase):
         self.assertEqual(7, len(workflow["nodes"]))
         self.assertIn("1. Agent 4 输入表单", workflow["connections"])
 
-    def test_unknown_agent_is_rejected(self):
-        """没有登记的 Agent 不能被调度，避免误以为 Agent 5 已经存在。"""
+
+    def test_agent5_is_registered_but_not_auto_runnable(self):
+        """Agent 5 v0.1 DEV 只登记交接信息，不能被 Workflow Manager 自动调度。"""
+        agent = workflow_manager.AGENT_REGISTRY["agent5"]
+
+        self.assertFalse(agent.enabled_for_cli)
+        self.assertIn("配音字幕", agent.description)
+        self.assertIn("v0.1 DEV", agent.description)
+        self.assertIn("ai-health-os-agent5-voiceover-subtitle-producer-v0.1-dev.json", str(agent.script_path))
+        self.assertIn("agent5_voiceover_subtitle_results.json", str(agent.default_output_path))
+        self.assertIn("agent5_voiceover_subtitle_report.md", str(agent.default_report_path))
+
         with self.assertRaises(ValueError):
             workflow_manager.run_agent("agent5", limit=5)
+
+    def test_agent5_n8n_workflow_is_dev_release(self):
+        """Agent 5 v0.1 DEV n8n 工作流应保持 7 个节点。"""
+        workflow_path = Path(workflow_manager.AGENT_REGISTRY["agent5"].script_path)
+        workflow = json.loads(workflow_path.read_text())
+
+        self.assertEqual("AI Health OS - Agent 5 Voiceover & Subtitle Producer v0.1 DEV", workflow["name"])
+        self.assertEqual(7, len(workflow["nodes"]))
+        self.assertIn("1. Agent5 输入", workflow["connections"])
+
+    def test_unknown_agent_is_rejected(self):
+        """没有登记的 Agent 不能被调度，避免误以为 Agent 6 已经存在。"""
+        with self.assertRaises(ValueError):
+            workflow_manager.run_agent("agent6", limit=5)
 
             workflow_manager.run_agent("agent3", limit=5)
 

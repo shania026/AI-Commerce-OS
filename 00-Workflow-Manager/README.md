@@ -123,3 +123,19 @@ Agent 4 负责接收 Agent 3 已通过 QA 的脚本，生成镜头规划、视�
 Agent 4 不会被 Workflow Manager 自动触发。必须先人工确认 Agent 3 的脚本，再单独运行 Agent 4 n8n 工作流。
 
 当前不要开发 Agent 5。
+
+## Agent 5 v0.1 DEV 预留说明
+
+Agent 5 Voiceover & Subtitle Producer v0.1 DEV 已创建为独立 n8n 工作流，并已在 Workflow Manager 中登记接口。
+
+导入文件：
+
+```text
+05-Voiceover-Subtitle-Producer/n8n/ai-health-os-agent5-voiceover-subtitle-producer-v0.1-dev.json
+```
+
+Agent 5 负责接收 Agent 4 中 `ready_for_agent5 = true` 的视觉方案，生成英文配音稿、分句配音、字幕、SRT、配音节奏、TTS Prompt 和 Markdown 报告。
+
+Agent 5 不会被 Workflow Manager 自动触发。必须先人工确认 Agent 4 的视觉方案，再单独运行 Agent 5 n8n 工作流。
+
+当前不要开发 Agent 6。

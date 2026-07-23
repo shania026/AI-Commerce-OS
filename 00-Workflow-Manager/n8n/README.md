@@ -322,3 +322,23 @@ Agent 4 已作为独立 n8n 工作流创建：
 5. 只把 `ready_for_agent5 = true` 的视觉方案交给未来 Agent 5。
 
 当前不要开发 Agent 5。
+
+## Agent 5 Voiceover & Subtitle Producer v0.1 DEV
+
+Agent 5 已作为独立 n8n 工作流创建：
+
+```text
+05-Voiceover-Subtitle-Producer/n8n/ai-health-os-agent5-voiceover-subtitle-producer-v0.1-dev.json
+```
+
+它使用 n8n 官方 Form Trigger、Code 和 Form Ending 节点，不写磁盘，不调用本地 Python，不调用 ElevenLabs 或任何外部 TTS 服务。
+
+使用顺序：
+
+1. 导入工作流 `AI Health OS - Agent 5 Voiceover & Subtitle Producer v0.1 DEV`；
+2. 在第 1 个节点粘贴 Agent 4 输出 JSON；
+3. 逐节点测试到第 7 个节点；
+4. 查看 Markdown Voiceover & Subtitle Report；
+5. 只把 `ready_for_agent6 = true` 的配音字幕包交给未来 Agent 6。
+
+当前不要开发 Agent 6。

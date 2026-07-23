@@ -174,3 +174,44 @@ Agent 4 不负责：
 6. 只把 `ready_for_agent5 = true` 的视觉方案交给未来 Agent 5。
 
 当前阶段请不要开发 Agent 5。
+
+## 9. 下一步如何使用 Agent 5？
+
+Agent 5 Voiceover & Subtitle Producer v0.1 DEV 已创建为独立 n8n 工作流。
+
+但请注意：Workflow Manager 当前主流程仍然只自动运行 Agent 1。Agent 5 只是登记了接口，不会自动接在 Agent 4 后面运行。
+
+Agent 5 负责：
+
+- 接收 Agent 4 中 `ready_for_agent5 = true` 的视觉方案；
+- 生成英文配音稿；
+- 生成分句配音；
+- 生成字幕和 SRT；
+- 生成配音节奏和 TTS Prompt；
+- 输出 JSON 和 Markdown 报告；
+- 将合格配音字幕包交给未来 Agent 6。
+
+Agent 5 不负责：
+
+- 实际生成音频；
+- 调用 ElevenLabs；
+- 发布视频；
+- 修改 Agent 4；
+- 开发 Agent 6。
+
+导入文件：
+
+```text
+05-Voiceover-Subtitle-Producer/n8n/ai-health-os-agent5-voiceover-subtitle-producer-v0.1-dev.json
+```
+
+普通用户操作顺序：
+
+1. 先运行 Agent 4；
+2. 人工确认 Agent 4 生成的视觉方案；
+3. 打开 Agent 5 n8n 表单；
+4. 粘贴 Agent 4 JSON；
+5. 查看 Agent 5 输出的 Markdown 报告；
+6. 只把 `ready_for_agent6 = true` 的配音字幕包交给未来 Agent 6。
+
+当前阶段请不要开发 Agent 6。
