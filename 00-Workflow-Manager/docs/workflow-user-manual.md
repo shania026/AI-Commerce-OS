@@ -98,14 +98,41 @@ Workflow Manager 执行完成。
 Reports/agent1_decision_report.md
 ```
 
-## 7. 下一步如何接入 Agent 2？
+## 7. 下一步如何使用 Agent 2？
 
-现在不要开发 Agent 2。
+Agent 2 V1.0 已正式发布。
 
-Workflow Manager 已经预留了 Agent 注册表。以后接入 Agent 2 时，只需要：
+但请注意：Workflow Manager 当前主流程仍然只自动运行 Agent 1。Agent 2 是独立 n8n 工作流，必须在你人工确认选题后单独运行。
 
-1. 先确认 Agent 2 已经单独开发完成；
-2. 再把 Agent 2 登记到 `workflow.py`；
-3. 让 Workflow Manager 在 Agent 1 后面调用 Agent 2。
+Agent 2 V1.0 负责：
 
-但这一步必须等你确认后再做。
+- 接收 Agent 1 人工确认后的选题；
+- 完成健康声明风险检查；
+- 完成安全改写；
+- 输出 JSON 和 Markdown 报告；
+- 将可用选题交给未来 Agent 3。
+
+Agent 2 V1.0 不负责：
+
+- 写完整脚本；
+- 生成视频；
+- 发布内容；
+- 开发 Agent 3。
+
+导入文件：
+
+```text
+00-Workflow-Manager/n8n/ai-health-os-agent2-compliance-rewriter-v1.0.json
+```
+
+普通用户操作顺序：
+
+1. 先运行 Agent 1；
+2. 打开 Agent 1 的 Markdown 决策报告；
+3. 人工确认 2–5 个选题；
+4. 打开 Agent 2 V1.0 n8n 表单；
+5. 粘贴 Agent 1 JSON；
+6. 填写人工确认的选题名称或编号；
+7. 查看 Agent 2 输出的中文合规改写报告。
+
+当前阶段请不要开发 Agent 3。

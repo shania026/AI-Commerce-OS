@@ -1,10 +1,10 @@
 {
-  "name": "AI Health OS - Agent 2 Health Compliance Rewriter v0.1 DEV",
+  "name": "AI Health OS - Agent 2 Health Compliance Rewriter V1.0",
   "nodes": [
     {
       "parameters": {
-        "formTitle": "AI Health OS - Agent 2 Health Compliance Rewriter v0.1 DEV",
-        "formDescription": "粘贴 Agent 1 已输出并经人工确认的 JSON。Agent 2 只做健康声明风险筛查和谨慎改写，不写完整脚本、不生成视频、不发布内容、不开发 Agent 3。",
+        "formTitle": "AI Health OS - Agent 2 Health Compliance Rewriter V1.0",
+        "formDescription": "Agent 2 V1.0 已正式发布。粘贴 Agent 1 已输出并经人工确认的 JSON。Agent 2 只做健康声明风险筛查和谨慎改写，不写完整脚本、不生成视频、不发布内容、不开发 Agent 3。",
         "formFields": {
           "values": [
             {
@@ -23,7 +23,7 @@
         },
         "options": {
           "appendAttribution": false,
-          "path": "ai-health-os-agent2-compliance-rewriter-dev"
+          "path": "ai-health-os-agent2-compliance-rewriter-v1"
         }
       },
       "id": "767b4b03-8947-4d2f-aa3b-80c9b7c6add7",
@@ -34,7 +34,7 @@
         -1260,
         220
       ],
-      "webhookId": "agent2-compliance-input"
+      "webhookId": "agent2-compliance-v1-input"
     },
     {
       "parameters": {
@@ -90,7 +90,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const data = $input.first()?.json || {};\nconst generatedAt = new Date().toISOString();\nconst rewrittenTopics = Array.isArray(data.rewritten_topics) ? data.rewritten_topics : [];\n\nfunction statusValue() {\n  if (data.status === 'error') return 'error';\n  if (data.status === 'insufficient_data') return 'insufficient_data';\n  return 'success';\n}\n\nconst readyTopics = rewrittenTopics.filter((topic) => topic.ready_for_agent3);\nconst reviewTopics = rewrittenTopics.filter((topic) => topic.review_required);\nconst blockedTopics = rewrittenTopics.filter((topic) => topic.final_risk_level === 'blocked' || topic.ready_for_agent3 === false);\n\nconst disclaimer = '本工具仅用于内容风险筛查和谨慎改写，不构成医疗、法律或平台合规意见。最终发布前仍需人工审核。';\n\nfunction topicList(topics) {\n  if (!topics.length) return '- 无。';\n  return topics.map((topic, index) => `- ${index + 1}. ${topic.compliant_title || topic.original_title}`).join('\\n');\n}\n\nfunction detailList(topics) {\n  if (!topics.length) return '- 无。';\n  return topics.map((topic, index) => [\n    `### ${index + 1}. ${topic.original_title}`,\n    `- 原标题：${topic.original_title}`,\n    `- 改写标题：${topic.compliant_title}`,\n    `- 原 Hook：${topic.original_hook || '无'}`,\n    `- 改写 Hook：${topic.compliant_hook}`,\n    `- 安全核心表述：${topic.safe_core_claim}`,\n    `- 原风险等级：${topic.risk_check?.risk_level || 'unknown'}`,\n    `- 最终风险等级：${topic.final_risk_level}`,\n    `- 标记词：${(topic.risk_check?.flagged_phrases || []).join(', ') || '无'}`,\n    `- 修改/移除词：${(topic.removed_or_changed_phrases || []).join(', ') || '无'}`,\n    `- 修改说明：${topic.rewrite_explanation}`,\n    `- 是否可进入 Agent 3：${topic.ready_for_agent3 ? 'Yes' : 'No'}`,\n    `- 是否需要人工复核：${topic.review_required ? 'Yes' : 'No'}`,\n  ].join('\\n')).join('\\n\\n');\n}\n\nconst jsonResult = {\n  workflow: 'AI Health OS',\n  source_agent: 'agent_1',\n  agent: 'agent_2',\n  version: '0.1',\n  status: statusValue(),\n  generated_at: generatedAt,\n  total_topics: rewrittenTopics.length,\n  approved_topics: data.selected_topics || [],\n  compliance_results: rewrittenTopics,\n  handoff: {\n    next_agent: 'agent_3',\n    ready_count: readyTopics.length,\n    blocked_count: blockedTopics.length,\n    manual_review_count: reviewTopics.length,\n  },\n  disclaimer,\n};\n\nlet reportMarkdown = '';\nif (jsonResult.status === 'error') {\n  reportMarkdown = [\n    '# AI Health OS — Agent 2 健康合规改写报告',\n    '',\n    '## 一、本次处理结果',\n    `- 状态：error`,\n    `- 错误原因：${data.parse_error || '未知错误'}`,\n    '',\n    '## 六、下一步',\n    '- 请回到 Agent 1，复制完整 JSON 后重新提交。',\n    '',\n    '## 重要说明',\n    disclaimer,\n  ].join('\\n');\n} else if (jsonResult.status === 'insufficient_data') {\n  reportMarkdown = [\n    '# AI Health OS — Agent 2 健康合规改写报告',\n    '',\n    '## 一、本次处理结果',\n    '- 状态：insufficient_data',\n    `- 原因：${data.selection_note || '没有合格选题。'}`,\n    '',\n    '## 二、可进入 Agent 3 的选题',\n    '- 无。',\n    '',\n    '## 三、需要人工复核的选题',\n    '- 无。',\n    '',\n    '## 四、被拦截的高风险选题',\n    '- 无。',\n    '',\n    '## 五、每个选题的修改说明',\n    '- 无。',\n    '',\n    '## 六、下一步',\n    '- 请在表单中填写人工确认的选题名称或编号，或确认 Agent 1 JSON 中存在 A/B 且 Yes 的选题。',\n    '',\n    '## 重要说明',\n    disclaimer,\n  ].join('\\n');\n} else {\n  reportMarkdown = [\n    '# AI Health OS — Agent 2 健康合规改写报告',\n    '',\n    '## 一、本次处理结果',\n    `- 本次处理选题数：${jsonResult.total_topics}`,\n    `- 可进入 Agent 3：${jsonResult.handoff.ready_count}`,\n    `- 需要人工复核：${jsonResult.handoff.manual_review_count}`,\n    `- 被拦截：${jsonResult.handoff.blocked_count}`,\n    '',\n    '## 二、可进入 Agent 3 的选题',\n    topicList(readyTopics),\n    '',\n    '## 三、需要人工复核的选题',\n    topicList(reviewTopics),\n    '',\n    '## 四、被拦截的高风险选题',\n    topicList(blockedTopics),\n    '',\n    '## 五、每个选题的修改说明',\n    detailList(rewrittenTopics),\n    '',\n    '## 六、下一步',\n    '- 只把 ready_for_agent3 = Yes 的选题交给未来 Agent 3。',\n    '- review_required = Yes 的选题必须先人工确认。',\n    '- blocked 或涉及治疗、治愈、替代药物、保证结果的内容不要继续制作。',\n    '',\n    '## 重要说明',\n    disclaimer,\n  ].join('\\n');\n}\n\nreturn [{\n  json: {\n    ...jsonResult,\n    report_markdown: reportMarkdown,\n  }\n}];"
+        "jsCode": "const data = $input.first()?.json || {};\nconst generatedAt = new Date().toISOString();\nconst rewrittenTopics = Array.isArray(data.rewritten_topics) ? data.rewritten_topics : [];\n\nfunction statusValue() {\n  if (data.status === 'error') return 'error';\n  if (data.status === 'insufficient_data') return 'insufficient_data';\n  return 'success';\n}\n\nconst readyTopics = rewrittenTopics.filter((topic) => topic.ready_for_agent3);\nconst reviewTopics = rewrittenTopics.filter((topic) => topic.review_required);\nconst blockedTopics = rewrittenTopics.filter((topic) => topic.final_risk_level === 'blocked' || topic.ready_for_agent3 === false);\n\nconst disclaimer = '本工具仅用于内容风险筛查和谨慎改写，不构成医疗、法律或平台合规意见。最终发布前仍需人工审核。';\n\nfunction topicList(topics) {\n  if (!topics.length) return '- 无。';\n  return topics.map((topic, index) => `- ${index + 1}. ${topic.compliant_title || topic.original_title}`).join('\\n');\n}\n\nfunction detailList(topics) {\n  if (!topics.length) return '- 无。';\n  return topics.map((topic, index) => [\n    `### ${index + 1}. ${topic.original_title}`,\n    `- 原标题：${topic.original_title}`,\n    `- 改写标题：${topic.compliant_title}`,\n    `- 原 Hook：${topic.original_hook || '无'}`,\n    `- 改写 Hook：${topic.compliant_hook}`,\n    `- 安全核心表述：${topic.safe_core_claim}`,\n    `- 原风险等级：${topic.risk_check?.risk_level || 'unknown'}`,\n    `- 最终风险等级：${topic.final_risk_level}`,\n    `- 标记词：${(topic.risk_check?.flagged_phrases || []).join(', ') || '无'}`,\n    `- 修改/移除词：${(topic.removed_or_changed_phrases || []).join(', ') || '无'}`,\n    `- 修改说明：${topic.rewrite_explanation}`,\n    `- 是否可进入 Agent 3：${topic.ready_for_agent3 ? 'Yes' : 'No'}`,\n    `- 是否需要人工复核：${topic.review_required ? 'Yes' : 'No'}`,\n  ].join('\\n')).join('\\n\\n');\n}\n\nconst jsonResult = {\n  workflow: 'AI Health OS',\n  source_agent: 'agent_1',\n  agent: 'agent_2',\n  version: '1.0',\n  status: statusValue(),\n  generated_at: generatedAt,\n  total_topics: rewrittenTopics.length,\n  approved_topics: data.selected_topics || [],\n  compliance_results: rewrittenTopics,\n  handoff: {\n    next_agent: 'agent_3',\n    ready_count: readyTopics.length,\n    blocked_count: blockedTopics.length,\n    manual_review_count: reviewTopics.length,\n  },\n  disclaimer,\n};\n\nlet reportMarkdown = '';\nif (jsonResult.status === 'error') {\n  reportMarkdown = [\n    '# AI Health OS — Agent 2 健康合规改写报告',\n    '',\n    '## 一、本次处理结果',\n    `- 状态：error`,\n    `- 错误原因：${data.parse_error || '未知错误'}`,\n    '',\n    '## 六、下一步',\n    '- 请回到 Agent 1，复制完整 JSON 后重新提交。',\n    '',\n    '## 重要说明',\n    disclaimer,\n  ].join('\\n');\n} else if (jsonResult.status === 'insufficient_data') {\n  reportMarkdown = [\n    '# AI Health OS — Agent 2 健康合规改写报告',\n    '',\n    '## 一、本次处理结果',\n    '- 状态：insufficient_data',\n    `- 原因：${data.selection_note || '没有合格选题。'}`,\n    '',\n    '## 二、可进入 Agent 3 的选题',\n    '- 无。',\n    '',\n    '## 三、需要人工复核的选题',\n    '- 无。',\n    '',\n    '## 四、被拦截的高风险选题',\n    '- 无。',\n    '',\n    '## 五、每个选题的修改说明',\n    '- 无。',\n    '',\n    '## 六、下一步',\n    '- 请在表单中填写人工确认的选题名称或编号，或确认 Agent 1 JSON 中存在 A/B 且 Yes 的选题。',\n    '',\n    '## 重要说明',\n    disclaimer,\n  ].join('\\n');\n} else {\n  reportMarkdown = [\n    '# AI Health OS — Agent 2 健康合规改写报告',\n    '',\n    '## 一、本次处理结果',\n    `- 本次处理选题数：${jsonResult.total_topics}`,\n    `- 可进入 Agent 3：${jsonResult.handoff.ready_count}`,\n    `- 需要人工复核：${jsonResult.handoff.manual_review_count}`,\n    `- 被拦截：${jsonResult.handoff.blocked_count}`,\n    '',\n    '## 二、可进入 Agent 3 的选题',\n    topicList(readyTopics),\n    '',\n    '## 三、需要人工复核的选题',\n    topicList(reviewTopics),\n    '',\n    '## 四、被拦截的高风险选题',\n    topicList(blockedTopics),\n    '',\n    '## 五、每个选题的修改说明',\n    detailList(rewrittenTopics),\n    '',\n    '## 六、下一步',\n    '- 只把 ready_for_agent3 = Yes 的选题交给未来 Agent 3。',\n    '- review_required = Yes 的选题必须先人工确认。',\n    '- blocked 或涉及治疗、治愈、替代药物、保证结果的内容不要继续制作。',\n    '',\n    '## 重要说明',\n    disclaimer,\n  ].join('\\n');\n}\n\nreturn [{\n  json: {\n    ...jsonResult,\n    report_markdown: reportMarkdown,\n  }\n}];"
       },
       "id": "7445cbd4-164f-4da5-8bfc-4d7d41c1a109",
       "name": "6. JSON 合规结果与 Markdown 报告",
@@ -104,7 +104,7 @@
     {
       "parameters": {
         "operation": "completion",
-        "completionTitle": "Agent 2 合规改写完成",
+        "completionTitle": "Agent 2 V1.0 合规改写完成",
         "completionMessage": "={{ $json.report_markdown + '\\n\\n---\\n\\nJSON 合规结果：\\n```json\\n' + JSON.stringify({ workflow: $json.workflow, source_agent: $json.source_agent, agent: $json.agent, version: $json.version, status: $json.status, generated_at: $json.generated_at, total_topics: $json.total_topics, approved_topics: $json.approved_topics, compliance_results: $json.compliance_results, handoff: $json.handoff, disclaimer: $json.disclaimer }, null, 2) + '\\n```' }}",
         "options": {}
       },
@@ -116,7 +116,7 @@
         60,
         220
       ],
-      "webhookId": "agent2-compliance-done"
+      "webhookId": "agent2-compliance-v1-done"
     }
   ],
   "pinData": {},

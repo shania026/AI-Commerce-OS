@@ -52,11 +52,11 @@ AGENT_REGISTRY: Dict[str, AgentSpec] = {
     ),
     "agent2": AgentSpec(
         name="agent2",
-        script_path=REPO_ROOT / "00-Workflow-Manager" / "n8n" / "ai-health-os-agent2-compliance-rewriter-v0.1-dev.json",
+        script_path=REPO_ROOT / "00-Workflow-Manager" / "n8n" / "ai-health-os-agent2-compliance-rewriter-v1.0.json",
         default_input_path=OUTPUTS_DIR / "agent1_ranked_health_topics.json",
         default_output_path=OUTPUTS_DIR / "agent2_compliance_results.json",
         default_report_path=REPORTS_DIR / "agent2_compliance_report.md",
-        description="健康合规改写 Agent（v0.1 DEV）：接收人工确认后的 Agent 1 选题，识别健康声明风险并谨慎改写标题、Hook 和核心表述。",
+        description="健康合规改写 Agent（V1.0）：接收人工确认后的 Agent 1 选题，完成健康声明风险检查、安全改写，并输出 JSON 和 Markdown 报告。",
         enabled_for_cli=False,
     ),
 }
@@ -117,7 +117,7 @@ def print_summary(completed_agents: List[AgentSpec]) -> None:
         print(f"- 已完成：{agent.name}｜{agent.description}")
         print(f"  JSON 输出：{agent.default_output_path}")
         print(f"  Markdown 报告：{agent.default_report_path}")
-    print("\n下一步：请先查看 Reports 里的决策报告；确认前不要开发 Agent 2。")
+    print("\n下一步：请先查看 Reports 里的决策报告；如需合规改写，请人工确认选题后使用 Agent 2 V1.0 独立 n8n 工作流。不要开发 Agent 3。")
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -78,4 +78,4 @@ Reports/agent1_decision_report.md
 - 默认报告路径；
 - 它负责什么。
 
-注意：这只是预留接口，不代表现在要开发 Agent 2。
+注意：Agent 2 V1.0 已正式发布，但仍然通过独立 n8n 工作流和人工确认步骤运行，不会自动触发 Agent 3。

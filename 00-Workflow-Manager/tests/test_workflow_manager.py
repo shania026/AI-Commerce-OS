@@ -1,6 +1,7 @@
 """Workflow Manager MVP 的基础测试。"""
 
 import importlib.util
+import json
 import unittest
 from pathlib import Path
 
@@ -33,10 +34,22 @@ class WorkflowManagerTest(unittest.TestCase):
 
         self.assertFalse(agent.enabled_for_cli)
         self.assertIn("健康合规改写", agent.description)
+        self.assertIn("V1.0", agent.description)
+        self.assertIn("ai-health-os-agent2-compliance-rewriter-v1.0.json", str(agent.script_path))
         self.assertIn("agent2_compliance_results.json", str(agent.default_output_path))
 
         with self.assertRaises(ValueError):
             workflow_manager.run_agent("agent2", limit=5)
+
+
+    def test_agent2_n8n_workflow_is_v1_release(self):
+        """Agent 2 V1.0 n8n 工作流应保持 7 个节点。"""
+        workflow_path = Path(workflow_manager.AGENT_REGISTRY["agent2"].script_path)
+        workflow = json.loads(workflow_path.read_text())
+
+        self.assertEqual("AI Health OS - Agent 2 Health Compliance Rewriter V1.0", workflow["name"])
+        self.assertEqual(7, len(workflow["nodes"]))
+        self.assertIn("1. Agent 2 输入表单", workflow["connections"])
 
     def test_unknown_agent_is_rejected(self):
         """没有登记的 Agent 不能被调度，避免误以为 Agent 3 已经存在。"""

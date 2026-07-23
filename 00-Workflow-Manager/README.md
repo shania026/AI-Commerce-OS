@@ -12,7 +12,7 @@ Workflow Manager 是 AI Health OS 的主框架。
 2. 调度已经完成的 Agent；
 3. 把 Agent 输出统一保存到 Outputs；
 4. 把给产品经理看的报告统一保存到 Reports；
-5. 为以后接入 Agent 2、Agent 3 预留入口。
+5. 为后续 Agent 保留人工确认和交接入口。
 
 ## 当前 MVP 做了什么？
 
@@ -75,8 +75,35 @@ Reports/agent1_decision_report.md
 
 这个导入版不使用 Execute Command 节点，避免部分 n8n Docker / n8n 2.x 环境显示 Unknown Node。
 
+## Agent 2 V1.0 发布说明
+
+Agent 2 V1.0 已正式发布。
+
+Agent 2 是独立 n8n 工作流，不会被 Workflow Manager 自动触发，仍然保留人工确认步骤。
+
+导入文件：
+
+```text
+00-Workflow-Manager/n8n/ai-health-os-agent2-compliance-rewriter-v1.0.json
+```
+
+Agent 2 V1.0 负责：
+
+- 接收 Agent 1 人工确认后的选题；
+- 完成健康声明风险检查；
+- 完成安全改写；
+- 输出 JSON 和 Markdown 报告；
+- 将可用选题交给未来 Agent 3。
+
+Agent 2 V1.0 不负责：
+
+- 写完整脚本；
+- 生成视频；
+- 发布内容；
+- 开发 Agent 3。
+
 ## 注意
 
-请不要在这个阶段开发 Agent 2。
+当前主流程仍然只自动运行 Agent 1。
 
-只有当你确认 Workflow Manager 能稳定调度 Agent 1 后，才讨论下一步是否接入 Agent 2。
+请不要开发 Agent 3。
