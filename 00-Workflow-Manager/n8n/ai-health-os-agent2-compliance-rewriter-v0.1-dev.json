@@ -1,0 +1,210 @@
+{
+  "name": "AI Health OS - Agent 2 Health Compliance Rewriter v0.1 DEV",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "AI Health OS - Agent 2 Health Compliance Rewriter v0.1 DEV",
+        "formDescription": "粘贴 Agent 1 已输出并经人工确认的 JSON。Agent 2 只做健康声明风险筛查和谨慎改写，不写完整脚本、不生成视频、不发布内容、不开发 Agent 3。",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "agent1_json",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "请粘贴 Agent 1 JSON 结果，可以是 JSON 数组、对象，或 ```json 包裹的内容。"
+            },
+            {
+              "fieldLabel": "approved_topics",
+              "fieldType": "textarea",
+              "requiredField": false,
+              "placeholder": "可选：输入人工确认的选题编号或名称，每行一个。例如：1\nWhy your evening tea choice matters"
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "path": "ai-health-os-agent2-compliance-rewriter-dev"
+        }
+      },
+      "id": "767b4b03-8947-4d2f-aa3b-80c9b7c6add7",
+      "name": "1. Agent 2 输入表单",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -1260,
+        220
+      ],
+      "webhookId": "agent2-compliance-input"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawInput = $input.first()?.json || {};\nlet rawAgent1Json = rawInput.agent1_json ?? rawInput['Agent 1 JSON 结果'] ?? rawInput.data ?? '';\nconst approvedTopicsText = String(rawInput.approved_topics ?? rawInput['人工确认的选题名称或编号'] ?? '').trim();\n\nfunction stripMarkdownFence(value) {\n  const text = typeof value === 'string' ? value.trim() : value;\n  if (typeof text !== 'string') {\n    return text;\n  }\n  return text\n    .replace(/^```json\\s*/i, '')\n    .replace(/^```\\s*/i, '')\n    .replace(/```$/i, '')\n    .trim();\n}\n\nfunction findTopicArray(value) {\n  if (Array.isArray(value)) {\n    return value;\n  }\n  if (!value || typeof value !== 'object') {\n    return [];\n  }\n  const possibleKeys = ['ranked_topics', 'top_topics', 'results', 'topics', 'recommendations', 'records'];\n  for (const key of possibleKeys) {\n    if (Array.isArray(value[key])) {\n      return value[key];\n    }\n  }\n  for (const key of Object.keys(value)) {\n    if (Array.isArray(value[key])) {\n      return value[key];\n    }\n  }\n  return [value];\n}\n\nfunction normalizeTopic(topic, index) {\n  const title = String(topic.title ?? topic.topic ?? topic.original_topic ?? topic.name ?? '').trim();\n  const ranking = Number(topic.ranking ?? topic.rank ?? topic.row_number ?? index + 1);\n  return {\n    ...topic,\n    title,\n    topic: title,\n    ranking,\n    source_index: index + 1,\n  };\n}\n\ntry {\n  let parsed = rawAgent1Json;\n  if (typeof parsed === 'string') {\n    const cleaned = stripMarkdownFence(parsed);\n    parsed = JSON.parse(cleaned);\n  }\n\n  const topics = findTopicArray(parsed)\n    .map((topic, index) => normalizeTopic(topic, index))\n    .filter((topic) => topic.title);\n\n  return [{\n    json: {\n      status: 'parsed',\n      parse_error: '',\n      approved_topics_text: approvedTopicsText,\n      topics,\n      total_topics: topics.length,\n    }\n  }];\n} catch (error) {\n  return [{\n    json: {\n      status: 'error',\n      parse_error: `Agent 1 JSON 解析失败：${error.message}`,\n      approved_topics_text: approvedTopicsText,\n      topics: [],\n      total_topics: 0,\n    }\n  }];\n}"
+      },
+      "id": "4d1bbe57-a86f-4855-9af2-b70afe359bfb",
+      "name": "2. 标准化 Agent 1 结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1040,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\n\nif (data.status === 'error') {\n  return [{\n    json: {\n      ...data,\n      selected_topics: [],\n      selected_count: 0,\n    }\n  }];\n}\n\nconst approvedText = String(data.approved_topics_text || '').trim();\nconst topics = Array.isArray(data.topics) ? data.topics : [];\n\nfunction normalizeText(value) {\n  return String(value || '').trim().toLowerCase();\n}\n\nfunction parseApprovedTokens(text) {\n  return text\n    .split(/[\\n,，;；]+/)\n    .map((item) => item.trim())\n    .filter(Boolean);\n}\n\nlet selectedTopics = [];\n\nif (approvedText) {\n  const tokens = parseApprovedTokens(approvedText);\n  selectedTopics = topics.filter((topic) => {\n    const title = normalizeText(topic.title || topic.topic);\n    const ranking = String(topic.ranking || topic.rank || topic.source_index || '');\n    const rowNumber = String(topic.row_number || '');\n    return tokens.some((token) => {\n      const normalizedToken = normalizeText(token);\n      return ranking === token || rowNumber === token || title.includes(normalizedToken) || normalizedToken.includes(title);\n    });\n  });\n} else {\n  selectedTopics = topics.filter((topic) => {\n    const recommended = normalizeText(topic.is_recommended_for_production || topic.recommendation || topic.recommended);\n    const grade = String(topic.recommendation_grade || topic.grade || '').trim().toUpperCase();\n    return (recommended === 'yes' || recommended === 'true' || recommended === 'recommended') && ['A', 'B'].includes(grade);\n  }).slice(0, 5);\n}\n\nconst limitedTopics = selectedTopics.slice(0, 5);\nconst status = limitedTopics.length > 0 ? 'selected' : 'insufficient_data';\n\nreturn [{\n  json: {\n    ...data,\n    status,\n    selected_topics: limitedTopics,\n    selected_count: limitedTopics.length,\n    selection_note: limitedTopics.length > 0\n      ? '已选择人工确认或默认合格选题。'\n      : '没有找到合格选题：请填写人工确认选题名称/编号，或提供 Agent 1 中 A/B 且 Yes 的选题。',\n  }\n}];"
+      },
+      "id": "0b203025-4ff6-4fe3-a44a-1e8096d1d6c8",
+      "name": "3. 筛选人工确认选题",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -820,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\n\nif (data.status === 'error' || data.status === 'insufficient_data') {\n  return [{\n    json: {\n      ...data,\n      risk_checked_topics: [],\n    }\n  }];\n}\n\nconst blockedPatterns = [\n  { phrase: 'cure', reason: '可能暗示治愈疾病。' },\n  { phrase: 'treat', reason: '可能暗示治疗疾病。' },\n  { phrase: 'prevent', reason: '可能暗示预防疾病。' },\n  { phrase: 'reverse', reason: '可能暗示逆转疾病或身体状态。' },\n  { phrase: 'heal', reason: '可能暗示修复或治愈。' },\n  { phrase: 'guaranteed', reason: '保证结果属于高风险绝对化表达。' },\n  { phrase: 'replace medication', reason: '不能暗示替代药物。' },\n  { phrase: 'stop medication', reason: '不能暗示停止服药。' },\n  { phrase: '治愈', reason: '可能暗示治愈疾病。' },\n  { phrase: '治疗', reason: '可能暗示治疗疾病。' },\n  { phrase: '预防疾病', reason: '可能暗示疾病预防。' },\n  { phrase: '逆转', reason: '可能暗示逆转疾病或身体状态。' },\n  { phrase: '根治', reason: '可能暗示根治疾病。' },\n  { phrase: '保证有效', reason: '保证结果属于高风险绝对化表达。' },\n  { phrase: '替代药物', reason: '不能暗示替代药物。' },\n  { phrase: '停止服药', reason: '不能暗示停止服药。' },\n];\n\nconst highPatterns = [\n  { phrase: 'eliminate', reason: '可能暗示完全消除健康问题。' },\n  { phrase: 'miracle', reason: '奇迹式效果属于高风险营销表达。' },\n  { phrase: 'detox', reason: '排毒表述容易被理解为生理功效声明。' },\n  { phrase: 'burn fat', reason: '燃脂属于强生理效果声明。' },\n  { phrase: 'rapid weight loss', reason: '快速减重属于高风险效果声明。' },\n  { phrase: 'lower blood sugar', reason: '降血糖涉及疾病相关生理指标。' },\n  { phrase: 'clinically proven', reason: '临床证明需要可靠依据，默认需要人工复核。' },\n  { phrase: '神奇疗效', reason: '神奇疗效属于高风险营销表达。' },\n  { phrase: '排毒', reason: '排毒表述容易被理解为生理功效声明。' },\n  { phrase: '快速减肥', reason: '快速减肥属于高风险效果声明。' },\n  { phrase: '降血糖', reason: '降血糖涉及疾病相关生理指标。' },\n];\n\nconst mediumPatterns = [\n  { phrase: 'diabetes', reason: '涉及具体疾病人群，需要谨慎。' },\n  { phrase: 'blood pressure', reason: '涉及生理指标，需要谨慎。' },\n  { phrase: 'inflammation', reason: '炎症相关表达可能被理解为医疗声明。' },\n  { phrase: 'pain relief', reason: '止痛/缓解疼痛可能被理解为治疗声明。' },\n  { phrase: '疾病', reason: '涉及疾病，需要谨慎。' },\n  { phrase: '血压', reason: '涉及生理指标，需要谨慎。' },\n  { phrase: '炎症', reason: '炎症相关表达可能被理解为医疗声明。' },\n  { phrase: '止痛', reason: '止痛可能被理解为治疗声明。' },\n];\n\nfunction includesPhrase(text, phrase) {\n  const lowerText = text.toLowerCase();\n  const lowerPhrase = phrase.toLowerCase();\n  if (/^[a-z0-9 ]+$/.test(lowerPhrase)) {\n    const escaped = lowerPhrase.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\\s+/g, '\\\\s+');\n    return new RegExp(`\\\\b${escaped}\\\\b`, 'i').test(lowerText);\n  }\n  return lowerText.includes(lowerPhrase);\n}\n\nfunction inspectTopic(topic) {\n  const combinedText = [\n    topic.title,\n    topic.topic,\n    topic.suggested_hook,\n    topic.hook,\n    topic.angle,\n    topic.recommendation_reason,\n    topic.risk_alerts,\n  ].flat().filter(Boolean).join(' ');\n\n  const matched = [];\n  for (const item of [...blockedPatterns, ...highPatterns, ...mediumPatterns]) {\n    if (includesPhrase(combinedText, item.phrase)) {\n      matched.push(item);\n    }\n  }\n\n  const blockedMatches = matched.filter((item) => blockedPatterns.some((pattern) => pattern.phrase === item.phrase));\n  const highMatches = matched.filter((item) => highPatterns.some((pattern) => pattern.phrase === item.phrase));\n  const mediumMatches = matched.filter((item) => mediumPatterns.some((pattern) => pattern.phrase === item.phrase));\n\n  let riskLevel = 'low';\n  if (blockedMatches.length > 0) {\n    riskLevel = 'blocked';\n  } else if (highMatches.length > 0) {\n    riskLevel = 'high';\n  } else if (mediumMatches.length > 0) {\n    riskLevel = 'medium';\n  }\n\n  return {\n    ...topic,\n    original_topic: topic.title || topic.topic,\n    detected_claims: matched.map((item) => item.reason),\n    flagged_phrases: matched.map((item) => item.phrase),\n    risk_level: riskLevel,\n    risk_reasons: matched.length > 0 ? matched.map((item) => item.reason) : ['未发现明显医疗声明词，但仍需人工确认。'],\n    needs_rewrite: riskLevel !== 'low',\n    compliance_note: '关键词匹配只是内容风险筛查，不构成最终医疗、法律或平台合规结论。',\n  };\n}\n\nconst riskCheckedTopics = (data.selected_topics || []).map(inspectTopic);\n\nreturn [{\n  json: {\n    ...data,\n    status: 'risk_checked',\n    risk_checked_topics: riskCheckedTopics,\n  }\n}];"
+      },
+      "id": "3abba295-a7e9-49de-93bd-6eaf2ebb00ed",
+      "name": "4. 健康声明风险检查",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -600,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\n\nif (data.status === 'error' || data.status === 'insufficient_data') {\n  return [{\n    json: {\n      ...data,\n      rewritten_topics: [],\n    }\n  }];\n}\n\nconst cautiousPhrases = [\n  'may support',\n  'may help support',\n  'is traditionally used for',\n  'has been studied for',\n  'some research suggests',\n  'is associated with',\n  'general wellness',\n  'educational information only',\n];\n\nconst replacements = [\n  ['cures', 'is traditionally discussed for general wellness around'],\n  ['cure', 'is traditionally discussed for general wellness around'],\n  ['treats', 'may support general wellness related to'],\n  ['treat', 'may support general wellness related to'],\n  ['prevents', 'may help support a healthy routine around'],\n  ['prevent', 'may help support a healthy routine around'],\n  ['reverses', 'is associated with general wellness conversations about'],\n  ['reverse', 'is associated with general wellness conversations about'],\n  ['heals', 'may help support comfort around'],\n  ['heal', 'may help support comfort around'],\n  ['eliminates', 'may help support a balanced routine around'],\n  ['eliminate', 'may help support a balanced routine around'],\n  ['guaranteed', 'worth exploring as general wellness education'],\n  ['miracle', 'traditional'],\n  ['detox', 'daily reset routine'],\n  ['burn fat', 'support an active lifestyle'],\n  ['rapid weight loss', 'balanced wellness routine'],\n  ['lower blood sugar', 'support general metabolic wellness education'],\n  ['replace medication', 'support general wellness education'],\n  ['stop medication', 'support general wellness education'],\n  ['clinically proven', 'has been studied for'],\n  ['治愈', '用于一般健康教育讨论'],\n  ['治疗', '用于一般健康支持讨论'],\n  ['预防疾病', '支持日常健康习惯'],\n  ['逆转', '用于一般健康教育讨论'],\n  ['根治', '用于一般健康教育讨论'],\n  ['保证有效', '可作为健康知识了解'],\n  ['神奇疗效', '传统使用背景'],\n  ['排毒', '日常轻盈感习惯'],\n  ['快速减肥', '平衡生活方式'],\n  ['降血糖', '代谢健康教育'],\n  ['替代药物', '一般健康教育'],\n  ['停止服药', '一般健康教育'],\n];\n\nfunction replacePhrase(text) {\n  let output = String(text || '').trim();\n  const changed = [];\n  for (const [from, to] of replacements) {\n    const escaped = from.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\\s+/g, '\\\\s+');\n    const regex = /^[a-z0-9 ]+$/i.test(from) ? new RegExp(`\\\\b${escaped}\\\\b`, 'gi') : new RegExp(escaped, 'g');\n    if (regex.test(output)) {\n      output = output.replace(regex, to);\n      changed.push(from);\n    }\n  }\n  return { output, changed };\n}\n\nfunction buildSafeTitle(topic) {\n  const originalTitle = String(topic.title || topic.topic || '').trim();\n  const replaced = replacePhrase(originalTitle);\n  if (replaced.output && replaced.output !== originalTitle) {\n    return replaced;\n  }\n  if (topic.risk_level === 'low') {\n    return { output: originalTitle, changed: [] };\n  }\n  return {\n    output: `${originalTitle}: what to know before sharing`,\n    changed: topic.flagged_phrases || [],\n  };\n}\n\nfunction buildSafeHook(topic) {\n  const originalHook = String(topic.suggested_hook || topic.hook || topic.recommendation_reason || topic.title || '').trim();\n  const replaced = replacePhrase(originalHook);\n  if (replaced.output && replaced.output !== originalHook) {\n    return replaced;\n  }\n  if (topic.risk_level === 'low') {\n    return { output: originalHook || `A simple wellness note about ${topic.title}.`, changed: [] };\n  }\n  return {\n    output: `Before turning this into health content, frame it as educational information only and avoid disease claims.`,\n    changed: topic.flagged_phrases || [],\n  };\n}\n\nfunction rewriteTopic(topic) {\n  const titleRewrite = buildSafeTitle(topic);\n  const hookRewrite = buildSafeHook(topic);\n  const changedPhrases = Array.from(new Set([...(titleRewrite.changed || []), ...(hookRewrite.changed || []), ...(topic.flagged_phrases || [])]));\n\n  let finalRiskLevel = topic.risk_level;\n  if (topic.risk_level === 'high' && changedPhrases.length > 0) {\n    finalRiskLevel = 'medium';\n  }\n  if (topic.risk_level === 'medium' && changedPhrases.length > 0) {\n    finalRiskLevel = 'low';\n  }\n\n  const reviewRequired = ['blocked', 'high', 'medium'].includes(topic.risk_level);\n  const readyForAgent3 = topic.risk_level === 'blocked' ? false : finalRiskLevel !== 'blocked';\n\n  return {\n    original_title: topic.title || topic.topic,\n    compliant_title: titleRewrite.output,\n    original_hook: topic.suggested_hook || topic.hook || '',\n    compliant_hook: hookRewrite.output,\n    safe_core_claim: `${cautiousPhrases[1]} general wellness education. Do not present this as medical advice, treatment, dosage guidance, or a guaranteed result.`,\n    removed_or_changed_phrases: changedPhrases,\n    rewrite_explanation: topic.needs_rewrite\n      ? '已将高风险或绝对化健康表达改为更谨慎的教育性、传统使用或一般健康支持表达。'\n      : '未发现明显高风险表达，保留原有吸引力，同时提醒发布前人工审核。',\n    final_risk_level: finalRiskLevel,\n    ready_for_agent3: readyForAgent3,\n    review_required: reviewRequired,\n    risk_check: {\n      detected_claims: topic.detected_claims || [],\n      flagged_phrases: topic.flagged_phrases || [],\n      risk_level: topic.risk_level,\n      risk_reasons: topic.risk_reasons || [],\n    },\n  };\n}\n\nconst rewrittenTopics = (data.risk_checked_topics || []).map(rewriteTopic);\n\nreturn [{\n  json: {\n    ...data,\n    status: 'rewritten',\n    rewritten_topics: rewrittenTopics,\n  }\n}];"
+      },
+      "id": "ce245f95-f5a6-40c8-9bd1-523de5fb123e",
+      "name": "5. 合规安全改写",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -380,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nconst generatedAt = new Date().toISOString();\nconst rewrittenTopics = Array.isArray(data.rewritten_topics) ? data.rewritten_topics : [];\n\nfunction statusValue() {\n  if (data.status === 'error') return 'error';\n  if (data.status === 'insufficient_data') return 'insufficient_data';\n  return 'success';\n}\n\nconst readyTopics = rewrittenTopics.filter((topic) => topic.ready_for_agent3);\nconst reviewTopics = rewrittenTopics.filter((topic) => topic.review_required);\nconst blockedTopics = rewrittenTopics.filter((topic) => topic.final_risk_level === 'blocked' || topic.ready_for_agent3 === false);\n\nconst disclaimer = '本工具仅用于内容风险筛查和谨慎改写，不构成医疗、法律或平台合规意见。最终发布前仍需人工审核。';\n\nfunction topicList(topics) {\n  if (!topics.length) return '- 无。';\n  return topics.map((topic, index) => `- ${index + 1}. ${topic.compliant_title || topic.original_title}`).join('\\n');\n}\n\nfunction detailList(topics) {\n  if (!topics.length) return '- 无。';\n  return topics.map((topic, index) => [\n    `### ${index + 1}. ${topic.original_title}`,\n    `- 原标题：${topic.original_title}`,\n    `- 改写标题：${topic.compliant_title}`,\n    `- 原 Hook：${topic.original_hook || '无'}`,\n    `- 改写 Hook：${topic.compliant_hook}`,\n    `- 安全核心表述：${topic.safe_core_claim}`,\n    `- 原风险等级：${topic.risk_check?.risk_level || 'unknown'}`,\n    `- 最终风险等级：${topic.final_risk_level}`,\n    `- 标记词：${(topic.risk_check?.flagged_phrases || []).join(', ') || '无'}`,\n    `- 修改/移除词：${(topic.removed_or_changed_phrases || []).join(', ') || '无'}`,\n    `- 修改说明：${topic.rewrite_explanation}`,\n    `- 是否可进入 Agent 3：${topic.ready_for_agent3 ? 'Yes' : 'No'}`,\n    `- 是否需要人工复核：${topic.review_required ? 'Yes' : 'No'}`,\n  ].join('\\n')).join('\\n\\n');\n}\n\nconst jsonResult = {\n  workflow: 'AI Health OS',\n  source_agent: 'agent_1',\n  agent: 'agent_2',\n  version: '0.1',\n  status: statusValue(),\n  generated_at: generatedAt,\n  total_topics: rewrittenTopics.length,\n  approved_topics: data.selected_topics || [],\n  compliance_results: rewrittenTopics,\n  handoff: {\n    next_agent: 'agent_3',\n    ready_count: readyTopics.length,\n    blocked_count: blockedTopics.length,\n    manual_review_count: reviewTopics.length,\n  },\n  disclaimer,\n};\n\nlet reportMarkdown = '';\nif (jsonResult.status === 'error') {\n  reportMarkdown = [\n    '# AI Health OS — Agent 2 健康合规改写报告',\n    '',\n    '## 一、本次处理结果',\n    `- 状态：error`,\n    `- 错误原因：${data.parse_error || '未知错误'}`,\n    '',\n    '## 六、下一步',\n    '- 请回到 Agent 1，复制完整 JSON 后重新提交。',\n    '',\n    '## 重要说明',\n    disclaimer,\n  ].join('\\n');\n} else if (jsonResult.status === 'insufficient_data') {\n  reportMarkdown = [\n    '# AI Health OS — Agent 2 健康合规改写报告',\n    '',\n    '## 一、本次处理结果',\n    '- 状态：insufficient_data',\n    `- 原因：${data.selection_note || '没有合格选题。'}`,\n    '',\n    '## 二、可进入 Agent 3 的选题',\n    '- 无。',\n    '',\n    '## 三、需要人工复核的选题',\n    '- 无。',\n    '',\n    '## 四、被拦截的高风险选题',\n    '- 无。',\n    '',\n    '## 五、每个选题的修改说明',\n    '- 无。',\n    '',\n    '## 六、下一步',\n    '- 请在表单中填写人工确认的选题名称或编号，或确认 Agent 1 JSON 中存在 A/B 且 Yes 的选题。',\n    '',\n    '## 重要说明',\n    disclaimer,\n  ].join('\\n');\n} else {\n  reportMarkdown = [\n    '# AI Health OS — Agent 2 健康合规改写报告',\n    '',\n    '## 一、本次处理结果',\n    `- 本次处理选题数：${jsonResult.total_topics}`,\n    `- 可进入 Agent 3：${jsonResult.handoff.ready_count}`,\n    `- 需要人工复核：${jsonResult.handoff.manual_review_count}`,\n    `- 被拦截：${jsonResult.handoff.blocked_count}`,\n    '',\n    '## 二、可进入 Agent 3 的选题',\n    topicList(readyTopics),\n    '',\n    '## 三、需要人工复核的选题',\n    topicList(reviewTopics),\n    '',\n    '## 四、被拦截的高风险选题',\n    topicList(blockedTopics),\n    '',\n    '## 五、每个选题的修改说明',\n    detailList(rewrittenTopics),\n    '',\n    '## 六、下一步',\n    '- 只把 ready_for_agent3 = Yes 的选题交给未来 Agent 3。',\n    '- review_required = Yes 的选题必须先人工确认。',\n    '- blocked 或涉及治疗、治愈、替代药物、保证结果的内容不要继续制作。',\n    '',\n    '## 重要说明',\n    disclaimer,\n  ].join('\\n');\n}\n\nreturn [{\n  json: {\n    ...jsonResult,\n    report_markdown: reportMarkdown,\n  }\n}];"
+      },
+      "id": "7445cbd4-164f-4da5-8bfc-4d7d41c1a109",
+      "name": "6. JSON 合规结果与 Markdown 报告",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Agent 2 合规改写完成",
+        "completionMessage": "={{ $json.report_markdown + '\\n\\n---\\n\\nJSON 合规结果：\\n```json\\n' + JSON.stringify({ workflow: $json.workflow, source_agent: $json.source_agent, agent: $json.agent, version: $json.version, status: $json.status, generated_at: $json.generated_at, total_topics: $json.total_topics, approved_topics: $json.approved_topics, compliance_results: $json.compliance_results, handoff: $json.handoff, disclaimer: $json.disclaimer }, null, 2) + '\\n```' }}",
+        "options": {}
+      },
+      "id": "2a04c387-bd57-498c-8c89-4439e4b9393c",
+      "name": "7. 显示 Agent 2 报告",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        60,
+        220
+      ],
+      "webhookId": "agent2-compliance-done"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "1. Agent 2 输入表单": {
+      "main": [
+        [
+          {
+            "node": "2. 标准化 Agent 1 结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. 标准化 Agent 1 结果": {
+      "main": [
+        [
+          {
+            "node": "3. 筛选人工确认选题",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. 筛选人工确认选题": {
+      "main": [
+        [
+          {
+            "node": "4. 健康声明风险检查",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. 健康声明风险检查": {
+      "main": [
+        [
+          {
+            "node": "5. 合规安全改写",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. 合规安全改写": {
+      "main": [
+        [
+          {
+            "node": "6. JSON 合规结果与 Markdown 报告",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. JSON 合规结果与 Markdown 报告": {
+      "main": [
+        [
+          {
+            "node": "7. 显示 Agent 2 报告",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d8b8083d-e4ad-42e8-8ba6-78117561cc74",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "AI Health OS"
+    },
+    {
+      "name": "Agent 2"
+    },
+    {
+      "name": "DEV"
+    }
+  ]
+}
