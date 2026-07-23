@@ -240,3 +240,64 @@ Screen fatigue and your tea routine
 ```text
 1. 上传 CSV 表单
 ```
+
+---
+
+# Agent 2：Health Compliance Rewriter v0.1 DEV
+
+这是独立的 Agent 2 n8n 工作流，不会修改 Agent 1，也不会自动触发 Agent 3。
+
+导入文件：
+
+```text
+00-Workflow-Manager/n8n/ai-health-os-agent2-compliance-rewriter-v0.1-dev.json
+```
+
+导入后 workflow 名称：
+
+```text
+AI Health OS - Agent 2 Health Compliance Rewriter v0.1 DEV
+```
+
+## Agent 2 负责什么？
+
+Agent 2 只负责：
+
+1. 接收 Agent 1 输出并经过人工确认的 2–5 个健康选题；
+2. 识别医疗声明、健康声明、绝对化表达和平台合规风险；
+3. 标记风险词、风险等级和原因；
+4. 改写标题、Hook 和核心表述；
+5. 判断是否适合进入未来 Agent 3。
+
+Agent 2 不负责：
+
+- 不写完整视频脚本；
+- 不生成图片或视频；
+- 不配音；
+- 不发布内容；
+- 不提供医疗或法律意见；
+- 不保证内容一定符合所有法规或平台规则；
+- 不开发 Agent 3。
+
+## Agent 2 的 7 个节点
+
+| 节点 | 名称 | 作用 |
+| --- | --- | --- |
+| 1 | Agent 2 输入表单 | 粘贴 Agent 1 JSON，填写人工确认选题 |
+| 2 | 标准化 Agent 1 结果 | 安全解析 JSON 字符串、对象、数组或代码块 |
+| 3 | 筛选人工确认选题 | 只保留人工确认或默认 A/B 且 Yes 的前 5 个选题 |
+| 4 | 健康声明风险检查 | 识别医疗声明、风险词和绝对化表达 |
+| 5 | 合规安全改写 | 把高风险表达改成更谨慎的健康教育表达 |
+| 6 | JSON 合规结果与 Markdown 报告 | 同时生成机器可读 JSON 和中文报告 |
+| 7 | 显示 Agent 2 报告 | 用 Form Ending 动态显示报告 |
+
+## 使用方式
+
+1. 先运行 Agent 1，得到 JSON 排名结果；
+2. 人工选择 2–5 个想继续处理的选题；
+3. 打开 Agent 2 表单；
+4. 把 Agent 1 JSON 粘贴到 `agent1_json`；
+5. 在 `approved_topics` 中填写选题编号或名称；
+6. 提交后查看中文 Markdown 合规改写报告。
+
+重要说明：本工具仅用于内容风险筛查和谨慎改写，不构成医疗、法律或平台合规意见。最终发布前仍需人工审核。

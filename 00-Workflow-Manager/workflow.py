@@ -35,10 +35,12 @@ class AgentSpec:
     default_output_path: Path
     default_report_path: Path
     description: str
+    enabled_for_cli: bool = True
 
 
 # Agent 注册表：Workflow Manager 只认识这里登记过的 Agent。
-# 目前只登记 Agent 1；这里只是预留结构，不会开发 Agent 2。
+# 当前主流程仍然只自动调度 Agent 1。Agent 2 只登记名称、职责和默认交接路径，
+# 保留人工确认步骤，不会被 run_workflow 自动触发，也不会开发 Agent 3。
 AGENT_REGISTRY: Dict[str, AgentSpec] = {
     "agent1": AgentSpec(
         name="agent1",
@@ -47,7 +49,16 @@ AGENT_REGISTRY: Dict[str, AgentSpec] = {
         default_output_path=OUTPUTS_DIR / "agent1_ranked_health_topics.json",
         default_report_path=REPORTS_DIR / "agent1_decision_report.md",
         description="健康选题发现 Agent：读取候选选题 CSV，输出 JSON 排序和 Markdown 决策报告。",
-    )
+    ),
+    "agent2": AgentSpec(
+        name="agent2",
+        script_path=REPO_ROOT / "00-Workflow-Manager" / "n8n" / "ai-health-os-agent2-compliance-rewriter-v0.1-dev.json",
+        default_input_path=OUTPUTS_DIR / "agent1_ranked_health_topics.json",
+        default_output_path=OUTPUTS_DIR / "agent2_compliance_results.json",
+        default_report_path=REPORTS_DIR / "agent2_compliance_report.md",
+        description="健康合规改写 Agent（v0.1 DEV）：接收人工确认后的 Agent 1 选题，识别健康声明风险并谨慎改写标题、Hook 和核心表述。",
+        enabled_for_cli=False,
+    ),
 }
 
 
@@ -80,6 +91,8 @@ def run_agent(agent_name: str, limit: int) -> AgentSpec:
         raise ValueError(f"未登记的 Agent：{agent_name}。当前可用：{available_agents}")
 
     agent = AGENT_REGISTRY[agent_name]
+    if not agent.enabled_for_cli:
+        raise ValueError(f"{agent.name} 已登记为预留 Agent，但尚未接入 Workflow Manager 自动调度；请先通过人工确认和独立 n8n 工作流运行。")
     if not agent.script_path.exists():
         raise FileNotFoundError(f"找不到 Agent 脚本：{agent.script_path}")
     if not agent.default_input_path.exists():
