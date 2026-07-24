@@ -94,9 +94,8 @@
         "source": "database",
         "workflowId": {
           "__rl": true,
-          "value": "REPLACE_WITH_REAL_WORKFLOW_ID_AGENT_1",
-          "mode": "list",
-          "cachedResultName": "SELECT AFTER IMPORT: AI Health OS - Agent 1 Memory Analysis V1.0"
+          "value": "",
+          "mode": "list"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -186,9 +185,8 @@
         "source": "database",
         "workflowId": {
           "__rl": true,
-          "value": "REPLACE_WITH_REAL_WORKFLOW_ID_AGENT_2",
-          "mode": "list",
-          "cachedResultName": "SELECT AFTER IMPORT: AI Health OS - Agent 2 Health Compliance Rewriter V1.1"
+          "value": "",
+          "mode": "list"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -278,9 +276,8 @@
         "source": "database",
         "workflowId": {
           "__rl": true,
-          "value": "REPLACE_WITH_REAL_WORKFLOW_ID_AGENT_3",
-          "mode": "list",
-          "cachedResultName": "SELECT AFTER IMPORT: AI Health OS - Agent 3 Script Writer V1.1"
+          "value": "",
+          "mode": "list"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -370,9 +367,8 @@
         "source": "database",
         "workflowId": {
           "__rl": true,
-          "value": "REPLACE_WITH_REAL_WORKFLOW_ID_AGENT_4",
-          "mode": "list",
-          "cachedResultName": "SELECT AFTER IMPORT: AI Health OS - Agent 4 Visual Director V1.1"
+          "value": "",
+          "mode": "list"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -462,9 +458,8 @@
         "source": "database",
         "workflowId": {
           "__rl": true,
-          "value": "REPLACE_WITH_REAL_WORKFLOW_ID_AGENT_5",
-          "mode": "list",
-          "cachedResultName": "SELECT AFTER IMPORT: AI Health OS - Agent 5 Voiceover & Subtitle Producer V1.1"
+          "value": "",
+          "mode": "list"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -554,9 +549,8 @@
         "source": "database",
         "workflowId": {
           "__rl": true,
-          "value": "REPLACE_WITH_REAL_WORKFLOW_ID_AGENT_6",
-          "mode": "list",
-          "cachedResultName": "SELECT AFTER IMPORT: AI Health OS - Agent 6 Publishing Package & Analytics V1.1"
+          "value": "",
+          "mode": "list"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
