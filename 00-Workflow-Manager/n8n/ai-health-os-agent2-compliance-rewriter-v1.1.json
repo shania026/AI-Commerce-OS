@@ -3,38 +3,16 @@
   "nodes": [
     {
       "parameters": {
-        "formTitle": "AI Health OS - Agent 2 Health Compliance Rewriter V1.1",
-        "formDescription": "Agent 2 V1.1：兼容 Agent E Memory Analysis V1.0 的 ranked_topics 输出。粘贴 Agent E / Agent 1 JSON，并可填写人工确认选题。Agent 2 只做健康声明风险筛查和谨慎改写，不写完整脚本、不生成视频、不发布内容、不开发 Agent 3。",
-        "formFields": {
-          "values": [
-            {
-              "fieldLabel": "agent1_json",
-              "fieldType": "textarea",
-              "requiredField": true,
-              "placeholder": "请粘贴 Agent 1 JSON 结果，可以是 JSON 数组、对象，或 ```json 包裹的内容。"
-            },
-            {
-              "fieldLabel": "approved_topics",
-              "fieldType": "textarea",
-              "requiredField": false,
-              "placeholder": "可选：输入人工确认的选题编号或名称，每行一个。例如：1\nWhy your evening tea choice matters"
-            }
-          ]
-        },
-        "options": {
-          "appendAttribution": false,
-          "path": "ai-health-os-agent2-compliance-rewriter-v11"
-        }
+        "inputSource": "passthrough"
       },
-      "id": "767b4b03-8947-4d2f-aa3b-80c9b7c6add7",
-      "name": "1. Agent 2 输入表单",
-      "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.5,
+      "id": "agent2-v11-execute-trigger",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
       "position": [
-        -1260,
-        220
-      ],
-      "webhookId": "agent2-compliance-v11-input"
+        -700,
+        0
+      ]
     },
     {
       "parameters": {
@@ -100,38 +78,10 @@
         -160,
         220
       ]
-    },
-    {
-      "parameters": {
-        "operation": "completion",
-        "completionTitle": "Agent 2 V1.1 合规改写完成",
-        "completionMessage": "={{ $json.report_markdown + '\\n\\n---\\n\\nJSON 合规结果：\\n```json\\n' + JSON.stringify({ workflow: $json.workflow, source_agent: $json.source_agent, agent: $json.agent, version: $json.version, status: $json.status, generated_at: $json.generated_at, total_topics: $json.total_topics, approved_topics: $json.approved_topics, compliance_results: $json.compliance_results, handoff: $json.handoff, disclaimer: $json.disclaimer }, null, 2) + '\\n```' }}",
-        "options": {}
-      },
-      "id": "2a04c387-bd57-498c-8c89-4439e4b9393c",
-      "name": "7. 显示 Agent 2 报告",
-      "type": "n8n-nodes-base.form",
-      "typeVersion": 2.5,
-      "position": [
-        60,
-        220
-      ],
-      "webhookId": "agent2-compliance-v1-done"
     }
   ],
   "pinData": {},
   "connections": {
-    "1. Agent 2 输入表单": {
-      "main": [
-        [
-          {
-            "node": "2. 标准化 Agent 1 结果",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "2. 标准化 Agent 1 结果": {
       "main": [
         [
@@ -176,11 +126,11 @@
         ]
       ]
     },
-    "6. JSON 合规结果与 Markdown 报告": {
+    "When Executed by Another Workflow": {
       "main": [
         [
           {
-            "node": "7. 显示 Agent 2 报告",
+            "node": "2. 标准化 Agent 1 结果",
             "type": "main",
             "index": 0
           }

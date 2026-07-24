@@ -3,32 +3,16 @@
   "nodes": [
     {
       "parameters": {
-        "formTitle": "AI Health OS - Agent 5 Voiceover & Subtitle Producer V1.1",
-        "formDescription": "Agent 5 V1.1：兼容 Agent 4 V1.1 的 visual_plans 输出。粘贴 Agent 4 JSON 后，为 ready_for_agent5 = true 的视觉方案生成英文配音稿、字幕、SRT、TTS Prompt 和节奏说明。",
-        "formFields": {
-          "values": [
-            {
-              "fieldLabel": "agent4_json",
-              "fieldType": "textarea",
-              "requiredField": true,
-              "placeholder": "请粘贴 Agent 4 V1.1 输出的完整 JSON。"
-            }
-          ]
-        },
-        "options": {
-          "appendAttribution": false,
-          "path": "ai-health-os-agent5-voiceover-subtitle-v11"
-        }
+        "inputSource": "passthrough"
       },
-      "id": "a5-form-input",
-      "name": "1. Agent5 输入",
-      "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.5,
+      "id": "agent5-v11-execute-trigger",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
       "position": [
-        -1340,
-        220
-      ],
-      "webhookId": "agent5-voiceover-v11-input"
+        -700,
+        0
+      ]
     },
     {
       "parameters": {
@@ -94,38 +78,10 @@
         -240,
         220
       ]
-    },
-    {
-      "parameters": {
-        "operation": "completion",
-        "completionTitle": "Agent 5 V1.1 Voiceover & Subtitle Report 完成",
-        "completionMessage": "={{ $json.report_markdown + '\\n\\n---\\n\\nJSON Voiceover Package：\\n```json\\n' + JSON.stringify({ workflow: $json.workflow, source_agent: $json.source_agent, agent: $json.agent, version: $json.version, status: $json.status, generated_at: $json.generated_at, total_visual_plans: $json.total_visual_plans, voiceover_packages: $json.voiceover_packages, handoff: $json.handoff, disclaimer: $json.disclaimer }, null, 2) + '\\n```' }}",
-        "options": {}
-      },
-      "id": "a5-form-ending",
-      "name": "7. 显示报告",
-      "type": "n8n-nodes-base.form",
-      "typeVersion": 2.5,
-      "position": [
-        -20,
-        220
-      ],
-      "webhookId": "agent5-voiceover-v11-done"
     }
   ],
   "pinData": {},
   "connections": {
-    "1. Agent5 输入": {
-      "main": [
-        [
-          {
-            "node": "2. 标准化 Agent4 JSON",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "2. 标准化 Agent4 JSON": {
       "main": [
         [
@@ -170,11 +126,11 @@
         ]
       ]
     },
-    "6. JSON + Markdown": {
+    "When Executed by Another Workflow": {
       "main": [
         [
           {
-            "node": "7. 显示报告",
+            "node": "2. 标准化 Agent4 JSON",
             "type": "main",
             "index": 0
           }

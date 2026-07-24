@@ -3,32 +3,16 @@
   "nodes": [
     {
       "parameters": {
-        "formTitle": "AI Health OS - Agent 4 Visual Director V1.1",
-        "formDescription": "Agent 4 V1.1：兼容 Agent 3 V1.1 的 scripts 输出。粘贴 Agent 3 JSON 后，为脚本生成视觉方案、分镜、镜头、B-roll 和生成式媒体 Prompt。",
-        "formFields": {
-          "values": [
-            {
-              "fieldLabel": "agent3_json",
-              "fieldType": "textarea",
-              "requiredField": true,
-              "placeholder": "请粘贴 Agent 3 V1.1 输出的完整 JSON。"
-            }
-          ]
-        },
-        "options": {
-          "appendAttribution": false,
-          "path": "ai-health-os-agent4-visual-director-v11"
-        }
+        "inputSource": "passthrough"
       },
-      "id": "a4-form-input",
-      "name": "1. Agent 4 输入表单",
-      "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.5,
+      "id": "agent4-v11-execute-trigger",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
       "position": [
-        -1340,
-        220
-      ],
-      "webhookId": "agent4-visual-director-v11-input"
+        -700,
+        0
+      ]
     },
     {
       "parameters": {
@@ -94,38 +78,10 @@
         -240,
         220
       ]
-    },
-    {
-      "parameters": {
-        "operation": "completion",
-        "completionTitle": "Agent 4 V1.1 Visual Director Report 完成",
-        "completionMessage": "={{ $json.report_markdown + '\\n\\n---\\n\\nJSON Visual Plan：\\n```json\\n' + JSON.stringify({ workflow: $json.workflow, source_agent: $json.source_agent, agent: $json.agent, version: $json.version, status: $json.status, generated_at: $json.generated_at, total_scripts: $json.total_scripts, visual_plans: $json.visual_plans, handoff: $json.handoff, disclaimer: $json.disclaimer }, null, 2) + '\\n```' }}",
-        "options": {}
-      },
-      "id": "a4-form-ending",
-      "name": "7. 显示 Agent 4 报告",
-      "type": "n8n-nodes-base.form",
-      "typeVersion": 2.5,
-      "position": [
-        -20,
-        220
-      ],
-      "webhookId": "agent4-visual-director-v11-done"
     }
   ],
   "pinData": {},
   "connections": {
-    "1. Agent 4 输入表单": {
-      "main": [
-        [
-          {
-            "node": "2. 标准化 Agent 3 JSON",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "2. 标准化 Agent 3 JSON": {
       "main": [
         [
@@ -170,11 +126,11 @@
         ]
       ]
     },
-    "6. JSON Visual Plan + Markdown Visual Report": {
+    "When Executed by Another Workflow": {
       "main": [
         [
           {
-            "node": "7. 显示 Agent 4 报告",
+            "node": "2. 标准化 Agent 3 JSON",
             "type": "main",
             "index": 0
           }

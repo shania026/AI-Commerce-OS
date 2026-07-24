@@ -88,18 +88,17 @@ class Agent3V11WorkflowTest(unittest.TestCase):
         return json.loads(result.stdout)
 
     def test_v11_workflow_name_and_nodes_are_preserved(self):
-        """复制版应改名 V1.1，但保留 7 个节点和节点名称。"""
+        """复制版应改名 V1.1，但保留 6 个可调用节点和节点名称。"""
         self.assertEqual("AI Health OS - Agent 3 Script Writer V1.1", self.workflow["name"])
-        self.assertEqual(7, len(self.workflow["nodes"]))
+        self.assertEqual(6, len(self.workflow["nodes"]))
         self.assertEqual(
             [
-                "1. Agent 3 输入表单",
+                "When Executed by Another Workflow",
                 "2. 标准化 Agent 2 JSON",
                 "3. 筛选可进入 Agent 3 的选题",
                 "4. Script Writer",
                 "5. Script QA",
                 "6. JSON Script + Markdown Script Report",
-                "7. 显示 Agent 3 报告",
             ],
             [node["name"] for node in self.workflow["nodes"]],
         )

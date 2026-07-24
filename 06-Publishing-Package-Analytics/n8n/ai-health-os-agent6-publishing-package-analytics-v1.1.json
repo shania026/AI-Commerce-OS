@@ -3,32 +3,16 @@
   "nodes": [
     {
       "parameters": {
-        "formTitle": "AI Health OS - Agent 6 Publishing Package & Analytics V1.1",
-        "formDescription": "粘贴 Agent 5 输出 JSON。Agent 6 只处理 ready_for_agent6 = true 的内容，生成发布文案包、检查清单、分析模板和 A/B 测试计划；不自动发布、不上传、不买广告、不回复评论、不开发 Agent 7。",
-        "formFields": {
-          "values": [
-            {
-              "fieldLabel": "agent5_json",
-              "fieldType": "textarea",
-              "requiredField": true,
-              "placeholder": "请粘贴 Agent 5 输出的完整 JSON。"
-            }
-          ]
-        },
-        "options": {
-          "appendAttribution": false,
-          "path": "ai-health-os-agent6-publishing-package-v11"
-        }
+        "inputSource": "passthrough"
       },
-      "id": "a6-form-input",
-      "name": "1. Agent6 输入",
-      "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.5,
+      "id": "agent6-v11-execute-trigger",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
       "position": [
-        -1340,
-        220
-      ],
-      "webhookId": "agent6-publishing-v11-input"
+        -700,
+        0
+      ]
     },
     {
       "parameters": {
@@ -94,37 +78,10 @@
         -240,
         220
       ]
-    },
-    {
-      "parameters": {
-        "operation": "completion",
-        "completionTitle": "Agent 6 Publishing Package & Analytics 报告",
-        "completionMessage": "={{ $json.report_markdown + '\\n\\n---\\n\\nJSON Publishing Package：\\n```json\\n' + JSON.stringify({ workflow: $json.workflow, source_agent: $json.source_agent, agent: $json.agent, version: $json.version, status: $json.status, generated_at: $json.generated_at, total_voiceover_packages: $json.total_voiceover_packages, publishing_packages: $json.publishing_packages, handoff: $json.handoff, disclaimer: $json.disclaimer }, null, 2) + '\\n```' }}",
-        "options": {}
-      },
-      "id": "a6-form-ending",
-      "name": "7. 显示报告",
-      "type": "n8n-nodes-base.form",
-      "typeVersion": 2.5,
-      "position": [
-        -20,
-        220
-      ]
     }
   ],
   "pinData": {},
   "connections": {
-    "1. Agent6 输入": {
-      "main": [
-        [
-          {
-            "node": "2. 标准化 Agent5 JSON",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "2. 标准化 Agent5 JSON": {
       "main": [
         [
@@ -169,11 +126,11 @@
         ]
       ]
     },
-    "6. JSON + Markdown": {
+    "When Executed by Another Workflow": {
       "main": [
         [
           {
-            "node": "7. 显示报告",
+            "node": "2. 标准化 Agent5 JSON",
             "type": "main",
             "index": 0
           }

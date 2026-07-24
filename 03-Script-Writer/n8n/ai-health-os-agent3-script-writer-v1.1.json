@@ -3,32 +3,16 @@
   "nodes": [
     {
       "parameters": {
-        "formTitle": "AI Health OS - Agent 3 Script Writer V1.1",
-        "formDescription": "Agent 3 V1.1：兼容 Agent 2 V1.1 的 compliance_results 输出。粘贴 Agent 2 JSON 后，只为 ready_for_agent3 = true 的选题生成 TikTok / Reels / Shorts 英文短视频脚本。",
-        "formFields": {
-          "values": [
-            {
-              "fieldLabel": "agent2_json",
-              "fieldType": "textarea",
-              "requiredField": true,
-              "placeholder": "请粘贴 Agent 2 输出的 JSON。"
-            }
-          ]
-        },
-        "options": {
-          "appendAttribution": false,
-          "path": "ai-health-os-agent3-script-writer-v11"
-        }
+        "inputSource": "passthrough"
       },
-      "id": "8877fc79-8501-4b3b-a9ca-9e29e01ae8de",
-      "name": "1. Agent 3 输入表单",
-      "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.5,
+      "id": "agent3-v11-execute-trigger",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
       "position": [
-        -1260,
-        220
-      ],
-      "webhookId": "agent3-script-writer-v11-input"
+        -700,
+        0
+      ]
     },
     {
       "parameters": {
@@ -94,38 +78,10 @@
         -160,
         220
       ]
-    },
-    {
-      "parameters": {
-        "operation": "completion",
-        "completionTitle": "Agent 3 V1.1 Script Report 完成",
-        "completionMessage": "={{ $json.report_markdown + '\\n\\n---\\n\\nJSON Script 输出：\\n```json\\n' + JSON.stringify({ workflow: $json.workflow, agent: $json.agent, version: $json.version, status: $json.status, scripts: $json.scripts, handoff: $json.handoff }, null, 2) + '\\n```' }}",
-        "options": {}
-      },
-      "id": "0fdca82c-cd56-4bf2-83e4-6561161ea9b5",
-      "name": "7. 显示 Agent 3 报告",
-      "type": "n8n-nodes-base.form",
-      "typeVersion": 2.5,
-      "position": [
-        60,
-        220
-      ],
-      "webhookId": "agent3-script-writer-v11-done"
     }
   ],
   "pinData": {},
   "connections": {
-    "1. Agent 3 输入表单": {
-      "main": [
-        [
-          {
-            "node": "2. 标准化 Agent 2 JSON",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "2. 标准化 Agent 2 JSON": {
       "main": [
         [
@@ -170,11 +126,11 @@
         ]
       ]
     },
-    "6. JSON Script + Markdown Script Report": {
+    "When Executed by Another Workflow": {
       "main": [
         [
           {
-            "node": "7. 显示 Agent 3 报告",
+            "node": "2. 标准化 Agent 2 JSON",
             "type": "main",
             "index": 0
           }

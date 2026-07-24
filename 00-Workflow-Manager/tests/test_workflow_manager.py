@@ -67,13 +67,13 @@ class WorkflowManagerTest(unittest.TestCase):
             workflow_manager.run_agent("agent2_v11", limit=5)
 
     def test_agent2_v11_n8n_workflow_is_compatible_copy(self):
-        """Agent 2 V1.1 复制版应保持 7 个节点。"""
+        """Agent 2 V1.1 复制版应为可调用子工作流。"""
         workflow_path = Path(workflow_manager.AGENT_REGISTRY["agent2_v11"].script_path)
         workflow = json.loads(workflow_path.read_text())
 
         self.assertEqual("AI Health OS - Agent 2 Health Compliance Rewriter V1.1", workflow["name"])
-        self.assertEqual(7, len(workflow["nodes"]))
-        self.assertIn("1. Agent 2 输入表单", workflow["connections"])
+        self.assertEqual(6, len(workflow["nodes"]))
+        self.assertIn("When Executed by Another Workflow", workflow["connections"])
 
     def test_agent3_v11_is_registered_but_original_agent3_remains(self):
         """Agent 3 V1.1 作为 Agent 2 V1.1 兼容复制版登记，原 V1.0 仍保留。"""
@@ -89,13 +89,13 @@ class WorkflowManagerTest(unittest.TestCase):
             workflow_manager.run_agent("agent3_v11", limit=5)
 
     def test_agent3_v11_n8n_workflow_is_compatible_copy(self):
-        """Agent 3 V1.1 复制版应保持 7 个节点。"""
+        """Agent 3 V1.1 复制版应为可调用子工作流。"""
         workflow_path = Path(workflow_manager.AGENT_REGISTRY["agent3_v11"].script_path)
         workflow = json.loads(workflow_path.read_text())
 
         self.assertEqual("AI Health OS - Agent 3 Script Writer V1.1", workflow["name"])
-        self.assertEqual(7, len(workflow["nodes"]))
-        self.assertIn("1. Agent 3 输入表单", workflow["connections"])
+        self.assertEqual(6, len(workflow["nodes"]))
+        self.assertIn("When Executed by Another Workflow", workflow["connections"])
 
 
     def test_agent4_is_registered_but_not_auto_runnable(self):
@@ -134,13 +134,13 @@ class WorkflowManagerTest(unittest.TestCase):
             workflow_manager.run_agent("agent4_v11", limit=5)
 
     def test_agent4_v11_n8n_workflow_is_compatible_copy(self):
-        """Agent 4 V1.1 复制版应保持 7 个节点。"""
+        """Agent 4 V1.1 复制版应为可调用子工作流。"""
         workflow_path = Path(workflow_manager.AGENT_REGISTRY["agent4_v11"].script_path)
         workflow = json.loads(workflow_path.read_text())
 
         self.assertEqual("AI Health OS - Agent 4 Visual Director V1.1", workflow["name"])
-        self.assertEqual(7, len(workflow["nodes"]))
-        self.assertIn("1. Agent 4 输入表单", workflow["connections"])
+        self.assertEqual(6, len(workflow["nodes"]))
+        self.assertIn("When Executed by Another Workflow", workflow["connections"])
 
 
     def test_agent5_is_registered_but_not_auto_runnable(self):
@@ -181,13 +181,13 @@ class WorkflowManagerTest(unittest.TestCase):
             workflow_manager.run_agent("agent5_v11", limit=5)
 
     def test_agent5_v11_n8n_workflow_is_compatible_copy(self):
-        """Agent 5 V1.1 复制版应保持 7 个节点。"""
+        """Agent 5 V1.1 复制版应为可调用子工作流。"""
         workflow_path = Path(workflow_manager.AGENT_REGISTRY["agent5_v11"].script_path)
         workflow = json.loads(workflow_path.read_text())
 
         self.assertEqual("AI Health OS - Agent 5 Voiceover & Subtitle Producer V1.1", workflow["name"])
-        self.assertEqual(7, len(workflow["nodes"]))
-        self.assertIn("1. Agent5 输入", workflow["connections"])
+        self.assertEqual(6, len(workflow["nodes"]))
+        self.assertIn("When Executed by Another Workflow", workflow["connections"])
 
 
     def test_agent6_is_registered_but_not_auto_runnable(self):
@@ -228,13 +228,13 @@ class WorkflowManagerTest(unittest.TestCase):
             workflow_manager.run_agent("agent6_v11", limit=5)
 
     def test_agent6_v11_n8n_workflow_is_compatible_copy(self):
-        """Agent 6 V1.1 复制版应保持 7 个节点。"""
+        """Agent 6 V1.1 复制版应为可调用子工作流。"""
         workflow_path = Path(workflow_manager.AGENT_REGISTRY["agent6_v11"].script_path)
         workflow = json.loads(workflow_path.read_text())
 
         self.assertEqual("AI Health OS - Agent 6 Publishing Package & Analytics V1.1", workflow["name"])
-        self.assertEqual(7, len(workflow["nodes"]))
-        self.assertIn("1. Agent6 输入", workflow["connections"])
+        self.assertEqual(6, len(workflow["nodes"]))
+        self.assertIn("When Executed by Another Workflow", workflow["connections"])
 
     def test_unknown_agent_is_rejected(self):
         """没有登记的 Agent 不能被调度，避免误以为 Agent 7 已经存在。"""
