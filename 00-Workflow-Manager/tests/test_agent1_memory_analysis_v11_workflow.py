@@ -73,10 +73,15 @@ class Agent1MemoryAnalysisV11WorkflowTest(unittest.TestCase):
             items = self.run_code_node(node_name, items)
 
         output = items[0]["json"]
+        self.assertTrue(output["success"])
+        self.assertEqual("agent1", output["agent"])
+        self.assertEqual("success", output["status"])
         self.assertEqual("json_ranking_result", output["output_type"])
         self.assertEqual("AI Health OS - Agent 1 Memory Analysis V1.1", output["workflow_name"])
         self.assertGreaterEqual(len(output["ranked_topics"]), 1)
         self.assertEqual("Rooibos Tea Before Bed", output["ranked_topics"][0]["title"])
+        self.assertEqual("agent_2", output["handoff"]["next_agent"])
+        self.assertGreaterEqual(output["handoff"]["ready_count"], 1)
         self.assertIn("markdown_report", output)
 
 

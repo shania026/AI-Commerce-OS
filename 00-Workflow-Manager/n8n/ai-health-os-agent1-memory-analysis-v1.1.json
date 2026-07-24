@@ -55,7 +55,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// JSON 最终输出分支：只输出排名结果，方便复制或给后续 Agent 使用。\nconst analysis = $input.first().json;\nreturn [{\n  json: {\n    output_type: 'json_ranking_result',\n    workflow_name: analysis.workflow_name,\n    today_limit: analysis.today_limit,\n    today_focus: analysis.today_focus,\n    ranked_topics: analysis.ranked_topics,\n    markdown_report: analysis.markdown_report\n  }\n}];"
+        "jsCode": "// JSON 最终输出分支：只输出排名结果，方便复制或给后续 Agent 使用。\n// 兼容 Master Orchestrator：保留原字段，同时补充 success / agent / status / handoff。\nconst analysis = $input.first().json;\nconst rankedTopics = Array.isArray(analysis.ranked_topics) ? analysis.ranked_topics : [];\nreturn [{\n  json: {\n    success: true,\n    agent: 'agent1',\n    status: 'success',\n    output_type: 'json_ranking_result',\n    workflow_name: analysis.workflow_name,\n    today_limit: analysis.today_limit,\n    today_focus: analysis.today_focus,\n    ranked_topics: rankedTopics,\n    total_topics: rankedTopics.length,\n    markdown_report: analysis.markdown_report,\n    handoff: {\n      next_agent: 'agent_2',\n      ready_count: rankedTopics.length\n    }\n  }\n}];"
       },
       "id": "agent1-v11-json-ranking",
       "name": "5. JSON 排名结果",
@@ -68,7 +68,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Markdown 决策报告分支：保留 Agent 2 需要的 JSON ranking 字段，同时附带 Markdown 报告。\nconst ranking = $input.first().json;\nreturn [{\n  json: {\n    output_type: 'json_ranking_result',\n    workflow_name: ranking.workflow_name,\n    today_limit: ranking.today_limit,\n    today_focus: ranking.today_focus,\n    ranked_topics: ranking.ranked_topics,\n    markdown_report: ranking.markdown_report,\n    report_markdown: ranking.markdown_report\n  }\n}];"
+        "jsCode": "// Markdown 决策报告分支：保留 Agent 2 需要的 JSON ranking 字段，同时附带 Markdown 报告。\n// 兼容 Master Orchestrator：保留原字段，同时补充 success / agent / status / handoff。\nconst ranking = $input.first().json;\nconst rankedTopics = Array.isArray(ranking.ranked_topics) ? ranking.ranked_topics : [];\nreturn [{\n  json: {\n    success: true,\n    agent: 'agent1',\n    status: 'success',\n    output_type: 'json_ranking_result',\n    workflow_name: ranking.workflow_name,\n    today_limit: ranking.today_limit,\n    today_focus: ranking.today_focus,\n    ranked_topics: rankedTopics,\n    total_topics: rankedTopics.length,\n    markdown_report: ranking.markdown_report,\n    report_markdown: ranking.markdown_report,\n    handoff: {\n      next_agent: 'agent_2',\n      ready_count: rankedTopics.length\n    }\n  }\n}];"
       },
       "id": "agent1-v11-markdown-report",
       "name": "6. Markdown 决策报告",
