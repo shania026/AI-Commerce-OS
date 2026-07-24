@@ -86,6 +86,15 @@ AGENT_REGISTRY: Dict[str, AgentSpec] = {
         description="视觉导演 Agent（v0.1 DEV）：接收 Agent 3 已通过 QA 的短视频脚本，生成镜头规划、视觉执行方案和生成式媒体 Prompt，并将可用方案交给 Agent 5。",
         enabled_for_cli=False,
     ),
+    "agent4_v11": AgentSpec(
+        name="agent4_v11",
+        script_path=REPO_ROOT / "04-Video-Director" / "n8n" / "ai-health-os-agent4-visual-director-v1.1.json",
+        default_input_path=OUTPUTS_DIR / "agent3_script_results_v1.1.json",
+        default_output_path=OUTPUTS_DIR / "agent4_visual_project_results_v1.1.json",
+        default_report_path=REPORTS_DIR / "agent4_visual_director_report_v1.1.md",
+        description="视觉导演 Agent（V1.1）：兼容 Agent 3 V1.1 scripts 输出，生成分镜、镜头、B-roll、屏幕文字和生成式媒体 Prompt，并将可用方案交给 Agent 5。",
+        enabled_for_cli=False,
+    ),
     "agent5": AgentSpec(
         name="agent5",
         script_path=REPO_ROOT / "05-Voiceover-Subtitle-Producer" / "n8n" / "ai-health-os-agent5-voiceover-subtitle-producer-v0.1-dev.json",

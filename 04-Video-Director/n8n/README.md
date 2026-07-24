@@ -35,3 +35,13 @@ AI Health OS - Agent 4 Visual Director v0.1 DEV
 ## 注意
 
 Agent 4 只生成视觉策划和 Prompt，不实际生成图片或视频。当前不要开发 Agent 5。
+
+## Agent 4 V1.1（Agent 3 V1.1 兼容复制版）
+
+原始 Agent 4 v0.1 DEV 工作流保留不变。为兼容上游 `AI Health OS - Agent 3 Script Writer V1.1` 的真实输出，新增复制版：
+
+```text
+04-Video-Director/n8n/ai-health-os-agent4-visual-director-v1.1.json
+```
+
+V1.1 只增强前端输入解析与筛选兼容：能够从外层数组、对象、JSON 字符串或 Markdown fenced JSON 中读取 `scripts[]`，并在 Agent 3 顶层 `handoff.next_agent = agent_4` 且 `ready_count > 0` 时处理脚本。视觉设计、Visual QA、Markdown Visual Report 和 `handoff.next_agent = agent_5` 结构保持不变，同时新增 `visual_projects` 作为 `visual_plans` 的兼容别名。
