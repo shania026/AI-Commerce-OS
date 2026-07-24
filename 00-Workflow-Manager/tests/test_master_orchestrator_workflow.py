@@ -65,6 +65,34 @@ class MasterOrchestratorWorkflowTest(unittest.TestCase):
         self.assertIn("Unified Error Report", node_names)
         self.assertIn("AI Health OS Final Report", node_names)
 
+    def test_success_check_true_and_false_branches_are_connected(self):
+        expected_true_targets = {
+            "Agent 1 Success Check": "Prepare Agent 2 Input",
+            "Agent 2 Success Check": "Prepare Agent 3 Input",
+            "Agent 3 Success Check": "Prepare Agent 4 Input",
+            "Agent 4 Success Check": "Prepare Agent 5 Input",
+            "Agent 5 Success Check": "Prepare Agent 6 Input",
+            "Agent 6 Success Check": "Build Final Master Report",
+        }
+
+        for node_name, true_target in expected_true_targets.items():
+            branches = self.workflow["connections"][node_name]["main"]
+            self.assertEqual(2, len(branches), msg=node_name)
+            self.assertEqual(true_target, branches[0][0]["node"], msg=f"{node_name} true branch")
+            self.assertEqual("Unified Error Report", branches[1][0]["node"], msg=f"{node_name} false branch")
+
+    def test_normal_processing_connections_remain_serial(self):
+        for agent_number in range(1, 7):
+            prepare = f"Prepare Agent {agent_number} Input"
+            execute = f"Execute Agent {agent_number}"
+            normalize = f"Normalize Agent {agent_number} Output"
+            success_check = f"Agent {agent_number} Success Check"
+            self.assertEqual(execute, self.workflow["connections"][prepare]["main"][0][0]["node"])
+            self.assertEqual(normalize, self.workflow["connections"][execute]["main"][0][0]["node"])
+            self.assertEqual(success_check, self.workflow["connections"][normalize]["main"][0][0]["node"])
+        self.assertEqual("AI Health OS Final Report", self.workflow["connections"]["Build Final Master Report"]["main"][0][0]["node"])
+        self.assertEqual("AI Health OS Final Report", self.workflow["connections"]["Unified Error Report"]["main"][0][0]["node"])
+
     def test_code_nodes_have_valid_javascript(self):
         for node_name, code in self.code_nodes.items():
             with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as handle:
