@@ -9,6 +9,16 @@
 导入后 workflow 名称：
 
 ```text
+
+## Agent 3 V1.1（Agent 2 V1.1 兼容复制版）
+
+原始 Agent 3 V1.0 工作流保留不变。为兼容上游 `AI Health OS - Agent 2 Health Compliance Rewriter V1.1` 的真实输出，新增复制版：
+
+```text
+03-Script-Writer/n8n/ai-health-os-agent3-script-writer-v1.1.json
+```
+
+V1.1 只修复前端输入解析与筛选兼容：能够从外层数组或对象中的 `compliance_results` 读取 `ready_for_agent3 = true` 的项目，并按索引或标题合并 `approved_topics`。脚本生成、Script QA、Markdown Script Report 和 `handoff.next_agent = agent_4` 结构保持不变。
 AI Health OS - Agent 3 Script Writer v0.1 DEV
 ```
 

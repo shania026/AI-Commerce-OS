@@ -68,6 +68,15 @@ AGENT_REGISTRY: Dict[str, AgentSpec] = {
         description="健康合规改写 Agent（V1.1）：兼容 Agent E Memory Analysis V1.0 ranked_topics 输出，保留人工确认后进行健康声明风险检查、安全改写，并输出 JSON 和 Markdown 报告。",
         enabled_for_cli=False,
     ),
+    "agent3_v11": AgentSpec(
+        name="agent3_v11",
+        script_path=REPO_ROOT / "03-Script-Writer" / "n8n" / "ai-health-os-agent3-script-writer-v1.1.json",
+        default_input_path=OUTPUTS_DIR / "agent2_compliance_results_v1.1.json",
+        default_output_path=OUTPUTS_DIR / "agent3_script_results_v1.1.json",
+        default_report_path=REPORTS_DIR / "agent3_script_report_v1.1.md",
+        description="短视频脚本生成 Agent（V1.1）：兼容 Agent 2 V1.1 compliance_results 输出，接收 ready_for_agent3 = true 的选题，生成 TikTok / Reels / Shorts 英文脚本，并输出 JSON 和 Markdown Script Report。",
+        enabled_for_cli=False,
+    ),
     "agent4": AgentSpec(
         name="agent4",
         script_path=REPO_ROOT / "04-Video-Director" / "n8n" / "ai-health-os-agent4-visual-director-v0.1-dev.json",
