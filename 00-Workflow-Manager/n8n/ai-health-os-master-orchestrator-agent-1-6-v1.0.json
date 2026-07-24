@@ -72,7 +72,7 @@
       "typeVersion": 2.5,
       "position": [
         -2600,
-        300
+        0
       ],
       "webhookId": "master-orchestrator-agent-1-6-v1"
     },
@@ -86,7 +86,7 @@
       "typeVersion": 2,
       "position": [
         -2380,
-        300
+        0
       ]
     },
     {
@@ -109,7 +109,7 @@
       "typeVersion": 2,
       "position": [
         -2160,
-        300
+        0
       ],
       "continueOnFail": true,
       "alwaysOutputData": true,
@@ -125,7 +125,7 @@
       "typeVersion": 2,
       "position": [
         -1940,
-        300
+        0
       ]
     },
     {
@@ -158,7 +158,7 @@
       "typeVersion": 2,
       "position": [
         -1720,
-        300
+        0
       ]
     },
     {
@@ -171,7 +171,7 @@
       "typeVersion": 2,
       "position": [
         -1500,
-        300
+        0
       ]
     },
     {
@@ -194,7 +194,7 @@
       "typeVersion": 2,
       "position": [
         -1280,
-        300
+        0
       ],
       "continueOnFail": true,
       "alwaysOutputData": true,
@@ -210,7 +210,7 @@
       "typeVersion": 2,
       "position": [
         -1060,
-        300
+        0
       ]
     },
     {
@@ -243,7 +243,7 @@
       "typeVersion": 2,
       "position": [
         -840,
-        300
+        0
       ]
     },
     {
@@ -255,8 +255,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -620,
-        300
+        -2600,
+        260
       ]
     },
     {
@@ -278,8 +278,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 2,
       "position": [
-        -400,
-        300
+        -2380,
+        260
       ],
       "continueOnFail": true,
       "alwaysOutputData": true,
@@ -294,8 +294,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -180,
-        300
+        -2160,
+        260
       ]
     },
     {
@@ -327,8 +327,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        40,
-        300
+        -1940,
+        260
       ]
     },
     {
@@ -340,8 +340,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        260,
-        300
+        -1720,
+        260
       ]
     },
     {
@@ -363,8 +363,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 2,
       "position": [
-        480,
-        300
+        -1500,
+        260
       ],
       "continueOnFail": true,
       "alwaysOutputData": true,
@@ -379,8 +379,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        700,
-        300
+        -1280,
+        260
       ]
     },
     {
@@ -412,8 +412,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        920,
-        300
+        -1060,
+        260
       ]
     },
     {
@@ -425,8 +425,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1140,
-        300
+        -2600,
+        520
       ]
     },
     {
@@ -448,8 +448,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 2,
       "position": [
-        1360,
-        300
+        -2380,
+        520
       ],
       "continueOnFail": true,
       "alwaysOutputData": true,
@@ -464,8 +464,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1580,
-        300
+        -2160,
+        520
       ]
     },
     {
@@ -497,8 +497,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        1800,
-        300
+        -1940,
+        520
       ]
     },
     {
@@ -510,8 +510,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2020,
-        300
+        -1720,
+        520
       ]
     },
     {
@@ -533,8 +533,8 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 2,
       "position": [
-        2240,
-        300
+        -1500,
+        520
       ],
       "continueOnFail": true,
       "alwaysOutputData": true,
@@ -549,8 +549,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2460,
-        300
+        -1280,
+        520
       ]
     },
     {
@@ -582,8 +582,8 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        2680,
-        300
+        -1060,
+        520
       ]
     },
     {
@@ -595,8 +595,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2900,
-        520
+        -840,
+        760
       ]
     },
     {
@@ -608,8 +608,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2900,
-        300
+        -840,
+        520
       ]
     },
     {
@@ -624,8 +624,8 @@
       "type": "n8n-nodes-base.form",
       "typeVersion": 2.5,
       "position": [
-        3120,
-        300
+        -620,
+        520
       ]
     }
   ],
