@@ -1,0 +1,204 @@
+{
+  "name": "AI Health OS - Agent 3 Script Writer v0.1 DEV",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "AI Health OS - Agent 3 Script Writer v0.1 DEV",
+        "formDescription": "粘贴 Agent 2 JSON。Agent 3 只处理 ready_for_agent3 = true 的选题，生成英文短视频脚本；不做健康声明审核，不生成视频，不发布，不开发 Agent 4。",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "agent2_json",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "请粘贴 Agent 2 输出的 JSON。"
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "path": "ai-health-os-agent3-script-writer-dev"
+        }
+      },
+      "id": "8877fc79-8501-4b3b-a9ca-9e29e01ae8de",
+      "name": "1. Agent 3 输入表单",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -1260,
+        220
+      ],
+      "webhookId": "agent3-script-input"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawInput = $input.first()?.json || {};\nlet rawAgent2Json = rawInput.agent2_json ?? rawInput['Agent 2 JSON 结果'] ?? rawInput.data ?? '';\n\nfunction stripMarkdownFence(value) {\n  const text = typeof value === 'string' ? value.trim() : value;\n  if (typeof text !== 'string') {\n    return text;\n  }\n  return text\n    .replace(/^```json\\s*/i, '')\n    .replace(/^```\\s*/i, '')\n    .replace(/```$/i, '')\n    .trim();\n}\n\nfunction findComplianceResults(value) {\n  if (Array.isArray(value)) {\n    return value;\n  }\n  if (!value || typeof value !== 'object') {\n    return [];\n  }\n  const possibleKeys = ['compliance_results', 'approved_topics', 'results', 'topics', 'records', 'scripts'];\n  for (const key of possibleKeys) {\n    if (Array.isArray(value[key])) {\n      return value[key];\n    }\n  }\n  for (const key of Object.keys(value)) {\n    if (Array.isArray(value[key])) {\n      return value[key];\n    }\n  }\n  return [value];\n}\n\nfunction normalizeTopic(topic, index) {\n  const title = String(topic.compliant_title ?? topic.title ?? topic.topic ?? topic.original_title ?? '').trim();\n  const hook = String(topic.compliant_hook ?? topic.hook ?? topic.original_hook ?? '').trim();\n  return {\n    ...topic,\n    normalized_title: title,\n    normalized_hook: hook,\n    source_index: index + 1,\n  };\n}\n\ntry {\n  let parsed = rawAgent2Json;\n  if (typeof parsed === 'string') {\n    parsed = JSON.parse(stripMarkdownFence(parsed));\n  }\n\n  const topics = findComplianceResults(parsed)\n    .map((topic, index) => normalizeTopic(topic, index))\n    .filter((topic) => topic.normalized_title);\n\n  return [{\n    json: {\n      status: 'parsed',\n      parse_error: '',\n      source_agent: parsed?.agent || 'agent_2',\n      topics,\n      total_topics: topics.length,\n    }\n  }];\n} catch (error) {\n  return [{\n    json: {\n      status: 'error',\n      parse_error: `Agent 2 JSON 解析失败：${error.message}`,\n      topics: [],\n      total_topics: 0,\n    }\n  }];\n}"
+      },
+      "id": "ffd78a56-5cbb-4d8a-8a74-9771cb4ebb9b",
+      "name": "2. 标准化 Agent 2 JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1040,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\n\nif (data.status === 'error') {\n  return [{\n    json: {\n      ...data,\n      script_topics: [],\n      selected_count: 0,\n    }\n  }];\n}\n\nfunction isReady(topic) {\n  return topic.ready_for_agent3 === true || topic.ready_for_agent3 === 'true' || topic.ready_for_agent3 === 'Yes' || topic.ready_for_agent3 === 'yes';\n}\n\nconst scriptTopics = (Array.isArray(data.topics) ? data.topics : [])\n  .filter(isReady)\n  .slice(0, 5);\n\nreturn [{\n  json: {\n    ...data,\n    status: scriptTopics.length > 0 ? 'ready_for_script' : 'insufficient_data',\n    script_topics: scriptTopics,\n    selected_count: scriptTopics.length,\n    selection_note: scriptTopics.length > 0\n      ? '已选择 ready_for_agent3 = true 的选题。'\n      : '没有 ready_for_agent3 = true 的选题，Agent 3 不会生成脚本。',\n  }\n}];"
+      },
+      "id": "56293dad-246a-4778-bb4a-b487e5bf0f21",
+      "name": "3. 筛选可进入 Agent 3 的选题",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -820,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\n\nif (data.status === 'error' || data.status === 'insufficient_data') {\n  return [{\n    json: {\n      ...data,\n      draft_scripts: [],\n    }\n  }];\n}\n\nconst riskyPhrases = ['cure', 'treat', 'prevent disease', 'replace medication'];\n\nfunction cleanText(value) {\n  let text = String(value || '').trim();\n  for (const phrase of riskyPhrases) {\n    const escaped = phrase.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\\s+/g, '\\\\s+');\n    text = text.replace(new RegExp(`\\\\b${escaped}\\\\b`, 'gi'), 'support general wellness');\n  }\n  return text;\n}\n\nfunction hashtagsFor(title) {\n  const lower = title.toLowerCase();\n  const tags = ['#WellnessTok', '#HealthyHabits', '#LearnOnTikTok'];\n  if (lower.includes('tea')) tags.push('#TeaTok');\n  if (lower.includes('rooibos')) tags.push('#Rooibos');\n  if (lower.includes('ginger')) tags.push('#Ginger');\n  if (lower.includes('routine')) tags.push('#DailyRoutine');\n  return Array.from(new Set(tags)).slice(0, 6);\n}\n\nfunction scriptFor(topic, index) {\n  const title = cleanText(topic.normalized_title || topic.compliant_title || topic.original_title);\n  const hookSource = cleanText(topic.normalized_hook || topic.compliant_hook || title);\n  const safeClaim = cleanText(topic.safe_core_claim || 'This is general wellness education, not medical advice.');\n  const videoTitle = `${title} | Simple wellness story`;\n  const hook = hookSource\n    ? `If you've seen this wellness idea online, here is the safer way to understand it: ${hookSource}`\n    : `This simple wellness idea is getting attention, but the wording matters.`;\n  const body = [\n    `Here is the idea: ${title}.`,\n    `Instead of making big health promises, frame it as general wellness education.`,\n    `${safeClaim}`,\n    `For short-form content, keep the message simple: explain the habit, show the routine, and avoid disease or medication claims.`,\n    `This keeps the video useful, clear, and safer for a US wellness audience.`\n  ].join(' ');\n  const cta = `Save this if you want more simple wellness ideas, and always check with a qualified professional for personal health questions.`;\n  return {\n    script_id: `agent3_script_${index + 1}`,\n    source_title: topic.original_title || topic.normalized_title,\n    video_title: videoTitle,\n    video_description: `A short educational wellness video about ${title}. Not medical advice.`,\n    video_goal: 'Turn an approved compliance-safe topic into a 30–45 second educational short video script.',\n    estimated_duration: '30–45 seconds',\n    hook,\n    body,\n    cta,\n    hashtags: hashtagsFor(title),\n    source_risk_level: topic.final_risk_level || topic.risk_level || 'unknown',\n  };\n}\n\nconst draftScripts = data.script_topics.map(scriptFor);\n\nreturn [{\n  json: {\n    ...data,\n    status: 'drafted',\n    draft_scripts: draftScripts,\n  }\n}];"
+      },
+      "id": "f3d8e348-4ee7-4193-a420-d11b9a2d4168",
+      "name": "4. Script Writer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -600,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\n\nif (data.status === 'error' || data.status === 'insufficient_data') {\n  return [{\n    json: {\n      ...data,\n      qa_scripts: [],\n    }\n  }];\n}\n\nconst blockedPhrases = ['cure', 'treat', 'prevent disease', 'replace medication'];\n\nfunction findBlocked(text) {\n  const lower = String(text || '').toLowerCase();\n  return blockedPhrases.filter((phrase) => lower.includes(phrase));\n}\n\nfunction safeRegeneratedHook(script) {\n  return `This wellness topic is interesting, but let's keep the wording careful and educational.`;\n}\n\nfunction qaScript(script) {\n  const hookIssues = findBlocked(script.hook);\n  const bodyIssues = findBlocked(script.body);\n  const ctaIssues = findBlocked(script.cta);\n  const allIssues = Array.from(new Set([...hookIssues, ...bodyIssues, ...ctaIssues]));\n  const hasHook = String(script.hook || '').trim().length >= 20;\n  const hasCta = String(script.cta || '').trim().length >= 20;\n  let fixedScript = { ...script };\n  let regenerated = false;\n\n  if (allIssues.length > 0) {\n    fixedScript.hook = safeRegeneratedHook(script);\n    fixedScript.body = String(script.body || '').replace(/cure|treat|prevent disease|replace medication/gi, 'support general wellness education');\n    fixedScript.cta = `Save this for general wellness education, and talk to a qualified professional for personal health questions.`;\n    regenerated = true;\n  }\n\n  return {\n    ...fixedScript,\n    qa: {\n      hook_is_attractive: hasHook,\n      cta_is_complete: hasCta,\n      blocked_phrases_found: allIssues,\n      regenerated_due_to_risk: regenerated,\n      passed: allIssues.length === 0 && hasHook && hasCta,\n    },\n  };\n}\n\nconst qaScripts = (data.draft_scripts || []).map(qaScript);\n\nreturn [{\n  json: {\n    ...data,\n    status: 'qa_complete',\n    qa_scripts: qaScripts,\n  }\n}];"
+      },
+      "id": "b9606862-ba60-4df5-bb8a-08c7cbf1bd9e",
+      "name": "5. Script QA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -380,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nconst generatedAt = new Date().toISOString();\nconst scripts = Array.isArray(data.qa_scripts) ? data.qa_scripts : [];\n\nfunction finalStatus() {\n  if (data.status === 'error') return 'error';\n  if (data.status === 'insufficient_data') return 'insufficient_data';\n  return 'success';\n}\n\nfunction scriptMarkdown(script, index) {\n  return [\n    `## ${index + 1}. ${script.video_title}`,\n    '',\n    `**视频目标：** ${script.video_goal}`,\n    '',\n    `**预计时长：** ${script.estimated_duration}`,\n    '',\n    `**Hook（3 秒）：** ${script.hook}`,\n    '',\n    `**Body（约 30 秒）：** ${script.body}`,\n    '',\n    `**CTA（约 5 秒）：** ${script.cta}`,\n    '',\n    `**Hashtags：** ${script.hashtags.join(' ')}`,\n    '',\n    `**质量检查结果：** ${script.qa?.passed ? 'Passed' : 'Needs review'}；重新生成：${script.qa?.regenerated_due_to_risk ? 'Yes' : 'No'}；风险词：${(script.qa?.blocked_phrases_found || []).join(', ') || 'None'}`,\n  ].join('\\n');\n}\n\nconst status = finalStatus();\nconst jsonResult = {\n  workflow: 'AI Health OS',\n  agent: 'agent_3',\n  version: '0.1 DEV',\n  status,\n  scripts: status === 'success' ? scripts : [],\n  handoff: {\n    next_agent: 'agent_4',\n    ready_count: status === 'success' ? scripts.length : 0,\n  },\n};\n\nlet reportMarkdown = '';\nif (status === 'error') {\n  reportMarkdown = [\n    '# Agent 3 Script Report',\n    '',\n    '生成脚本数量：0',\n    '',\n    `错误：${data.parse_error || '未知错误'}`,\n    '',\n    '下一步：请重新粘贴 Agent 2 JSON。',\n  ].join('\\n');\n} else if (status === 'insufficient_data') {\n  reportMarkdown = [\n    '# Agent 3 Script Report',\n    '',\n    '生成脚本数量：0',\n    '',\n    '没有 ready_for_agent3 = true 的选题，因此 Agent 3 没有生成脚本。',\n    '',\n    '下一步：请回到 Agent 2，确认至少一个选题 ready_for_agent3 = true。',\n  ].join('\\n');\n} else {\n  reportMarkdown = [\n    '# Agent 3 Script Report',\n    '',\n    `生成脚本数量：${scripts.length}`,\n    '',\n    ...scripts.map(scriptMarkdown),\n    '',\n    '## 下一步',\n    '',\n    '交给 Agent 4。',\n    '',\n    '重要说明：Agent 3 只负责英文短视频脚本，不负责健康声明审核、医疗合规判断、图片、视频、配音或发布。',\n  ].join('\\n');\n}\n\nreturn [{\n  json: {\n    ...jsonResult,\n    generated_at: generatedAt,\n    report_markdown: reportMarkdown,\n  }\n}];"
+      },
+      "id": "1fa56576-94c2-4a8f-804d-84b3a52bc0e1",
+      "name": "6. JSON Script + Markdown Script Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Agent 3 Script Writer 完成",
+        "completionMessage": "={{ $json.report_markdown + '\\n\\n---\\n\\nJSON Script 输出：\\n```json\\n' + JSON.stringify({ workflow: $json.workflow, agent: $json.agent, version: $json.version, status: $json.status, scripts: $json.scripts, handoff: $json.handoff }, null, 2) + '\\n```' }}",
+        "options": {}
+      },
+      "id": "0fdca82c-cd56-4bf2-83e4-6561161ea9b5",
+      "name": "7. 显示 Agent 3 报告",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        60,
+        220
+      ],
+      "webhookId": "agent3-script-done"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "1. Agent 3 输入表单": {
+      "main": [
+        [
+          {
+            "node": "2. 标准化 Agent 2 JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. 标准化 Agent 2 JSON": {
+      "main": [
+        [
+          {
+            "node": "3. 筛选可进入 Agent 3 的选题",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. 筛选可进入 Agent 3 的选题": {
+      "main": [
+        [
+          {
+            "node": "4. Script Writer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Script Writer": {
+      "main": [
+        [
+          {
+            "node": "5. Script QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Script QA": {
+      "main": [
+        [
+          {
+            "node": "6. JSON Script + Markdown Script Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. JSON Script + Markdown Script Report": {
+      "main": [
+        [
+          {
+            "node": "7. 显示 Agent 3 报告",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c44debdc-aa54-40d1-865b-7674076de446",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "AI Health OS"
+    },
+    {
+      "name": "Agent 3"
+    },
+    {
+      "name": "DEV"
+    }
+  ]
+}

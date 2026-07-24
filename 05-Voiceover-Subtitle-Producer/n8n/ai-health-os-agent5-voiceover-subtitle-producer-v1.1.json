@@ -1,0 +1,151 @@
+{
+  "name": "AI Health OS - Agent 5 Voiceover & Subtitle Producer V1.1",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "agent5-v11-execute-trigger",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -700,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawInput = $input.first()?.json || {};\nlet rawAgent4Json = rawInput.agent4_json ?? rawInput['Agent 4 JSON 结果'] ?? rawInput.data ?? '';\n\n// 去掉 Markdown 代码块外壳，方便用户直接粘贴报告里的 JSON。\nfunction stripMarkdownFence(value) {\n  const text = typeof value === 'string' ? value.trim() : value;\n  if (typeof text !== 'string') return text;\n  return text.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```$/i, '').trim();\n}\n\nfunction looksLikeVisualPlan(item) {\n  return !!item && typeof item === 'object' && (\n    item.visual_style !== undefined || item.scenes !== undefined || item.ready_for_agent5 !== undefined || item.video_title !== undefined\n  );\n}\n\nfunction unwrapAgent4Payload(value) {\n  if (Array.isArray(value)) {\n    const wrapper = value.find((item) => item && typeof item === 'object' && (Array.isArray(item.visual_plans) || Array.isArray(item.visual_projects)));\n    if (wrapper) return wrapper;\n    return { visual_plans: value.filter(looksLikeVisualPlan), status: value.length ? 'success' : 'insufficient_data', handoff: {} };\n  }\n  if (value && typeof value === 'object') return value;\n  return {};\n}\n\n// 自动寻找 Agent 4 常见视觉方案数组，优先读取 visual_plans[]，兼容 visual_projects[] 和旧字段。\nfunction findVisualPlans(payload) {\n  if (!payload || typeof payload !== 'object') return [];\n  const possibleKeys = ['visual_plans', 'visual_projects', 'plans', 'results', 'records', 'approved_visual_plans'];\n  for (const key of possibleKeys) {\n    if (Array.isArray(payload[key])) return payload[key];\n  }\n  return looksLikeVisualPlan(payload) ? [payload] : [];\n}\n\nfunction text(value) { return String(value ?? '').trim(); }\nfunction normalizePlan(plan, index) {\n  const scenes = Array.isArray(plan.scenes) ? plan.scenes : (Array.isArray(plan.scene_list) ? plan.scene_list : []);\n  return {\n    ...plan,\n    script_id: text(plan.script_id || plan.id || `agent4_visual_plan_${index + 1}`),\n    video_title: text(plan.video_title || plan.title || plan.topic || `Untitled Visual Plan ${index + 1}`),\n    scenes,\n    source_index: index + 1,\n  };\n}\n\ntry {\n  let parsed = rawAgent4Json;\n  if (typeof parsed === 'string') parsed = JSON.parse(stripMarkdownFence(parsed));\n  const payload = unwrapAgent4Payload(parsed);\n  const visual_plans = findVisualPlans(payload)\n    .map((plan, index) => normalizePlan(plan, index))\n    .filter((plan) => plan.video_title);\n  return [{\n    json: {\n      status: 'parsed',\n      parse_error: '',\n      source_agent: 'agent_4',\n      source_status: payload.status || '',\n      source_handoff: payload.handoff || {},\n      visual_plans,\n      total_visual_plans: visual_plans.length,\n    }\n  }];\n} catch (error) {\n  return [{ json: { status: 'error', parse_error: `Agent 4 JSON 解析失败：${error.message}`, source_agent: 'agent_4', visual_plans: [], total_visual_plans: 0 } }];\n}"
+      },
+      "id": "a5-code-2",
+      "name": "2. 标准化 Agent4 JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nif (data.status === 'error') return [{ json: { ...data, voiceover_input_plans: [], selected_count: 0 } }];\nfunction truthy(value) { return value === true || value === 1 || value === '1' || value === 'true' || value === 'True' || value === 'Yes' || value === 'yes'; }\nconst selected = (Array.isArray(data.visual_plans) ? data.visual_plans : [])\n  .filter((plan) => truthy(plan.ready_for_agent5))\n  .slice(0, 5);\nreturn [{ json: { ...data, status: selected.length > 0 ? 'ready_for_voiceover' : 'insufficient_data', voiceover_input_plans: selected, selected_count: selected.length, selection_note: selected.length > 0 ? '已选择 ready_for_agent5 = true 的视觉方案。' : '没有 ready_for_agent5 = true 的视觉方案，Agent 5 不会生成配音或字幕。' } }];"
+      },
+      "id": "a5-code-3",
+      "name": "3. 筛选 ready_for_agent5",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -900,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nif (data.status === 'error' || data.status === 'insufficient_data') return [{ json: { ...data, draft_voiceover_packages: [] } }];\nfunction text(value) { return String(value ?? '').trim(); }\nfunction parseSeconds(value) { const m = text(value).match(/\\d+(?:\\.\\d+)?/); return m ? Number(m[0]) : 0; }\nfunction fmtSrtTime(seconds) {\n  const totalMs = Math.max(0, Math.round(seconds * 1000));\n  const h = String(Math.floor(totalMs / 3600000)).padStart(2, '0');\n  const m = String(Math.floor((totalMs % 3600000) / 60000)).padStart(2, '0');\n  const s = String(Math.floor((totalMs % 60000) / 1000)).padStart(2, '0');\n  const ms = String(totalMs % 1000).padStart(3, '0');\n  return `${h}:${m}:${s},${ms}`;\n}\nfunction cleanNarration(value, fallback) {\n  const safe = text(value || fallback).replace(/\\s+/g, ' ');\n  return safe || 'Show this wellness moment clearly and calmly.';\n}\nfunction subtitleLine(value) {\n  const clean = cleanNarration(value, '').replace(/[\\n\\r]+/g, ' ');\n  return clean.length > 72 ? `${clean.slice(0, 69)}...` : clean;\n}\nfunction buildPackage(plan, index) {\n  const scenes = plan.scenes.length ? plan.scenes : [{ scene_number: 1, start_time: '0s', end_time: '5s', duration_seconds: 5, narration_text: plan.video_title }];\n  const segments = scenes.map((scene, sceneIndex) => {\n    const start = parseSeconds(scene.start_time) || scenes.slice(0, sceneIndex).reduce((sum, item) => sum + Number(item.duration_seconds || 4), 0);\n    const duration = Number(scene.duration_seconds || Math.max(3, parseSeconds(scene.end_time) - start) || 4);\n    const end = start + duration;\n    const narration = cleanNarration(scene.narration_text, plan.video_title);\n    return {\n      segment_number: sceneIndex + 1,\n      scene_number: scene.scene_number || sceneIndex + 1,\n      start_time_seconds: start,\n      end_time_seconds: end,\n      duration_seconds: duration,\n      voiceover_text: narration,\n      subtitle_text: subtitleLine(narration),\n      pacing: duration <= 3 ? 'fast hook pace' : (duration >= 5 ? 'calm explanatory pace' : 'natural short-form pace'),\n      delivery_notes: sceneIndex === 0 ? 'Open with clear energy in the first three seconds.' : 'Keep voice warm, clear, and educational.',\n    };\n  });\n  const fullVoiceover = segments.map((s) => s.voiceover_text).join(' ');\n  const srt = segments.map((s) => `${s.segment_number}\\n${fmtSrtTime(s.start_time_seconds)} --> ${fmtSrtTime(s.end_time_seconds)}\\n${s.subtitle_text}`).join('\\n\\n');\n  return {\n    package_id: `agent5_voiceover_${index + 1}`,\n    source_script_id: plan.script_id,\n    video_title: plan.video_title,\n    language: 'en-US',\n    voice_style: 'warm, calm, trustworthy wellness narrator',\n    estimated_duration_seconds: segments.reduce((sum, s) => sum + Number(s.duration_seconds || 0), 0),\n    full_voiceover_script: fullVoiceover,\n    voiceover_script: fullVoiceover,\n    voiceover_segments: segments,\n    narration_segments: segments,\n    subtitles: segments.map((s) => ({ index: s.segment_number, start: s.start_time_seconds, end: s.end_time_seconds, text: s.subtitle_text })),\n    subtitle_segments: segments.map((s) => ({ index: s.segment_number, start: s.start_time_seconds, end: s.end_time_seconds, text: s.subtitle_text })),\n    srt,\n    voiceover_pacing: 'Start with a slightly brighter hook, then slow into calm educational pacing, and end with a gentle CTA.',\n    pacing_notes: 'Start with a slightly brighter hook, then slow into calm educational pacing, and end with a gentle CTA.',\n    tts_prompt: `Read in natural American English, warm and calm wellness tone, clear articulation, short-form social video pacing, no medical authority voice, no exaggerated claims. Title: ${plan.video_title}`,\n  };\n}\nconst draftVoiceoverPackages = (data.voiceover_input_plans || []).map(buildPackage);\nreturn [{ json: { ...data, status: 'voiceover_drafted', draft_voiceover_packages: draftVoiceoverPackages } }];"
+      },
+      "id": "a5-code-4",
+      "name": "4. Voiceover Producer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nif (data.status === 'error' || data.status === 'insufficient_data') return [{ json: { ...data, qa_voiceover_packages: [] } }];\nconst riskyTerms = ['guaranteed result', 'cure', 'treat', 'treatment', 'prevent disease', 'replace medication', 'stop medication', 'FDA approved', 'clinically proven', '治愈', '治疗', '替代药物', '停止服药'];\nconst negativeContextWords = ['do not', \"don't\", 'avoid', 'never', 'no', 'not', 'without', 'instead of', 'do not present', 'do not claim', 'must not', 'should not', 'cannot', \"can't\", '禁止', '避免', '不要', '不得', '不能', '不应'];\nfunction text(value) { return String(value ?? '').trim(); }\nfunction escapeRegExp(value) { return String(value).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'); }\nfunction phraseRegex(term) {\n  const escaped = escapeRegExp(term).replace(/\\s+/g, '\\\\s+');\n  return /^[a-z0-9 ]+$/i.test(term) ? new RegExp(`\\\\b${escaped}\\\\b`, 'i') : new RegExp(escaped, 'i');\n}\nfunction splitSentences(value) {\n  return text(value).split(/(?<=[.!?。！？])\\s+|[;；\\n]+/).map((item) => item.trim()).filter(Boolean);\n}\nfunction isNegativeContext(sentence, term) {\n  const lower = sentence.toLowerCase();\n  const termLower = term.toLowerCase();\n  const index = lower.indexOf(termLower);\n  const prefix = index >= 0 ? lower.slice(0, index) : lower;\n  return negativeContextWords.some((word) => prefix.includes(word) || lower.startsWith(`${word} `));\n}\nfunction findRisk(value) {\n  const matches = [];\n  for (const sentence of splitSentences(value)) {\n    for (const term of riskyTerms) {\n      if (phraseRegex(term).test(sentence) && !isNegativeContext(sentence, term)) matches.push(term);\n    }\n  }\n  return Array.from(new Set(matches));\n}\nfunction fmtSrtTime(seconds) {\n  const totalMs = Math.max(0, Math.round(seconds * 1000));\n  const h = String(Math.floor(totalMs / 3600000)).padStart(2, '0');\n  const m = String(Math.floor((totalMs % 3600000) / 60000)).padStart(2, '0');\n  const s = String(Math.floor((totalMs % 60000) / 1000)).padStart(2, '0');\n  const ms = String(totalMs % 1000).padStart(3, '0');\n  return `${h}:${m}:${s},${ms}`;\n}\nfunction qaPackage(pkg) {\n  const issues = [];\n  const corrections = [];\n  const fixed = { ...pkg };\n  if (!Array.isArray(fixed.voiceover_segments) || fixed.voiceover_segments.length === 0) {\n    issues.push('缺少分句配音 segments。');\n    fixed.voiceover_segments = [{ segment_number: 1, start_time_seconds: 0, end_time_seconds: 5, duration_seconds: 5, voiceover_text: fixed.video_title || 'General wellness video.', subtitle_text: fixed.video_title || 'General wellness video.', pacing: 'natural short-form pace', delivery_notes: 'Use a calm voice.' }];\n    corrections.push('已补充分句配音占位。');\n  }\n  fixed.voiceover_segments = fixed.voiceover_segments.map((segment, index) => {\n    const repaired = { ...segment };\n    if (!repaired.segment_number || repaired.segment_number !== index + 1) { repaired.segment_number = index + 1; corrections.push(`修复第 ${index + 1} 条分句编号。`); }\n    if (!text(repaired.voiceover_text)) { repaired.voiceover_text = fixed.video_title || 'General wellness video.'; corrections.push(`补充第 ${index + 1} 条配音文本。`); }\n    if (!text(repaired.subtitle_text)) { repaired.subtitle_text = text(repaired.voiceover_text).slice(0, 72); corrections.push(`补充第 ${index + 1} 条字幕。`); }\n    if (text(repaired.subtitle_text).length > 84) { repaired.subtitle_text = text(repaired.subtitle_text).slice(0, 81) + '...'; corrections.push(`缩短第 ${index + 1} 条字幕。`); }\n    if (Number(repaired.end_time_seconds) <= Number(repaired.start_time_seconds)) { repaired.end_time_seconds = Number(repaired.start_time_seconds || index * 4) + Number(repaired.duration_seconds || 4); corrections.push(`修复第 ${index + 1} 条字幕时间。`); }\n    return repaired;\n  });\n  fixed.full_voiceover_script = fixed.voiceover_segments.map((s) => s.voiceover_text).join(' ');\n  fixed.subtitles = fixed.voiceover_segments.map((s) => ({ index: s.segment_number, start: s.start_time_seconds, end: s.end_time_seconds, text: s.subtitle_text }));\n  fixed.srt = fixed.voiceover_segments.map((s) => `${s.segment_number}\\n${fmtSrtTime(s.start_time_seconds)} --> ${fmtSrtTime(s.end_time_seconds)}\\n${s.subtitle_text}`).join('\\n\\n');\n  if (!text(fixed.tts_prompt)) { fixed.tts_prompt = `Read in natural American English, warm calm wellness tone. Title: ${fixed.video_title}`; corrections.push('补充 TTS Prompt。'); }\n  const risk = findRisk(`${fixed.full_voiceover_script} ${fixed.srt} ${fixed.tts_prompt}`);\n  if (risk.length > 0) issues.push(`配音或字幕中出现高风险医疗表达：${Array.from(new Set(risk)).join(', ')}。`);\n  const qaScore = Math.max(0, 100 - issues.length * 25 - risk.length * 10);\n  const passed = issues.length === 0 && fixed.srt.includes('-->') && fixed.voiceover_segments.length > 0;\n  return { ...fixed, subtitle_qa: { passed, qa_score: qaScore, issues, corrections_made: corrections }, qa_passed: passed, qa_score: qaScore, qa_issues: issues, corrections_made: corrections, ready_for_agent6: passed };\n}\nconst qaVoiceoverPackages = (data.draft_voiceover_packages || []).map((pkg) => { try { return qaPackage(pkg); } catch (error) { return { ...pkg, qa_passed: false, qa_score: 0, qa_issues: [`单条配音字幕 QA 失败：${error.message}`], corrections_made: [], ready_for_agent6: false }; } });\nreturn [{ json: { ...data, status: 'qa_complete', qa_voiceover_packages: qaVoiceoverPackages } }];"
+      },
+      "id": "a5-code-5",
+      "name": "5. Subtitle QA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -460,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nconst generatedAt = new Date().toISOString();\nconst disclaimer = '本工具仅生成英文配音稿、字幕、SRT、配音节奏和 TTS Prompt，不实际生成音频，不调用 ElevenLabs 或任何外部 TTS 服务，也不构成医疗、法律或平台合规意见。最终制作和发布前仍需人工审核。';\nfunction buildReport(status, packages, parseError) {\n  const ready = packages.filter((pkg) => pkg.ready_for_agent6);\n  const failed = packages.filter((pkg) => !pkg.ready_for_agent6);\n  const lines = ['# AI Health OS — Agent 5 Voiceover & Subtitle Report', '', '## 一、本次处理结果', '', `- 状态：${status}`, `- 本次处理视觉方案数量：${packages.length}`, `- 可进入 Agent 6：${ready.length}`, `- 未通过 Subtitle QA：${failed.length}`];\n  if (parseError) lines.push(`- 解析错误：${parseError}`);\n  lines.push('', '## 二、可进入 Agent 6 的配音字幕包', '', ready.length ? ready.map((pkg) => `- ${pkg.video_title}｜QA ${pkg.qa_score} 分｜ready_for_agent6 = true`).join('\\n') : '- 暂无。');\n  lines.push('', '## 三、需要人工复核或未通过 QA 的内容', '', failed.length ? failed.map((pkg) => `- ${pkg.video_title}｜问题：${(pkg.qa_issues || []).join('；') || '未通过 QA'}`).join('\\n') : '- 暂无。');\n  lines.push('', '## 四、逐条配音与字幕', '');\n  for (const pkg of packages) {\n    lines.push(`### ${pkg.video_title}`, '', `- Voice Style：${pkg.voice_style}`, `- Estimated Duration：${pkg.estimated_duration_seconds} 秒`, `- QA：${pkg.qa_passed ? '通过' : '未通过'}（${pkg.qa_score} 分）`, `- TTS Prompt：${pkg.tts_prompt}`, '', '#### Full Voiceover', '', pkg.full_voiceover_script || '', '', '#### Segments', '', '| 分句 | 时间 | 配音文本 | 字幕 | 节奏 |', '| --- | --- | --- | --- | --- |');\n    for (const segment of pkg.voiceover_segments || []) lines.push(`| ${segment.segment_number} | ${segment.start_time_seconds}s-${segment.end_time_seconds}s | ${segment.voiceover_text} | ${segment.subtitle_text} | ${segment.pacing} |`);\n    lines.push('', '#### SRT', '', '```srt', pkg.srt || '', '```', '');\n  }\n  lines.push('## 五、下一步', '', '只有 `ready_for_agent6 = true` 的配音字幕包可以交给 Agent 6。当前不要开发 Agent 6，先人工检查语气、字幕可读性和健康表达安全性。', '', '## 重要说明', '', disclaimer);\n  return lines.join('\\n');\n}\nlet status = 'success';\nlet packages = Array.isArray(data.qa_voiceover_packages) ? data.qa_voiceover_packages : [];\nif (data.status === 'error') status = 'error';\nif (data.status === 'insufficient_data') status = 'insufficient_data';\nif (status !== 'success') packages = [];\nconst readyCount = packages.filter((pkg) => pkg.ready_for_agent6).length;\nconst failedCount = packages.filter((pkg) => !pkg.ready_for_agent6).length;\nconst manualReviewCount = packages.filter((pkg) => (pkg.corrections_made || []).length > 0 || (pkg.qa_issues || []).length > 0).length;\nreturn [{ json: { workflow: 'AI Health OS', source_agent: 'agent_4', agent: 'agent_5', version: '1.1', status, generated_at: generatedAt, total_visual_plans: packages.length, voiceover_packages: packages, handoff: { next_agent: 'agent_6', ready_count: readyCount, failed_qa_count: failedCount, manual_review_count: manualReviewCount }, disclaimer, parse_error: data.parse_error || '', report_markdown: buildReport(status, packages, data.parse_error || '') } }];"
+      },
+      "id": "a5-code-6",
+      "name": "6. JSON + Markdown",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "2. 标准化 Agent4 JSON": {
+      "main": [
+        [
+          {
+            "node": "3. 筛选 ready_for_agent5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. 筛选 ready_for_agent5": {
+      "main": [
+        [
+          {
+            "node": "4. Voiceover Producer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Voiceover Producer": {
+      "main": [
+        [
+          {
+            "node": "5. Subtitle QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Subtitle QA": {
+      "main": [
+        [
+          {
+            "node": "6. JSON + Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "2. 标准化 Agent4 JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "agent5-voiceover-subtitle-v01-dev",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "agent5-voiceover-subtitle-v01-dev",
+  "tags": []
+}
