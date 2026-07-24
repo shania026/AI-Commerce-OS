@@ -153,3 +153,20 @@ Agent 6 Publishing Package & Analytics v0.1 DEV 已创建为独立 n8n 工作流
 Agent 6 负责接收 Agent 5 中 `ready_for_agent6 = true` 的内容，生成多平台 Caption、Video Title、Cover Text、CTA、Hashtags、SEO Keywords、Suggested Posting Time、Publishing Checklist、Analytics Template 和 A/B Test Plan。
 
 Agent 6 不会自动发布、上传、购买广告或回复评论。当前不要开发 Agent 7。
+
+
+## Master Orchestrator V1.0
+
+新增总控 n8n 工作流：
+
+```text
+00-Workflow-Manager/n8n/ai-health-os-master-orchestrator-agent-1-6-v1.0.json
+```
+
+导入后的名称：
+
+```text
+AI Health OS - Master Orchestrator Agent 1-6 V1.0
+```
+
+该工作流通过 n8n 官方 `Execute Workflow` 节点串行调用 Agent 1 到 Agent 6，并在每个 Agent 后增加 Success Check；失败时统一进入 Error Report，成功时输出最终 Markdown 报告和 Agent 6 的 Publishing Package。它不会自动发布、不会上传平台、不会调用广告服务、不会回复评论，也不会开发 Agent 7。

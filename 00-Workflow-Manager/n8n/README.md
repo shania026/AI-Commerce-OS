@@ -372,3 +372,26 @@ Agent 6 已作为独立 n8n 工作流创建：
 ```
 
 V1.1 只修复第 2、3 节点的接口兼容，并把最终 `source_agent` 更新为 `agent_e`；健康声明风险检查、合规安全改写、Markdown 报告和 handoff 结构保持不变。
+
+## Master Orchestrator V1.0（Agent 1-6 总控工作流）
+
+```text
+00-Workflow-Manager/n8n/ai-health-os-master-orchestrator-agent-1-6-v1.0.json
+```
+
+导入后工作流名称是：
+
+```text
+AI Health OS - Master Orchestrator Agent 1-6 V1.0
+```
+
+该总控工作流不复制 Agent 1 到 Agent 6 的内部节点，而是使用 n8n 官方 `Execute Workflow` 节点串行调用已经测试通过的子工作流：
+
+1. `AI Health OS Agent 1 Memory Analysis V1.0`
+2. `AI Health OS - Agent 2 Health Compliance Rewriter V1.1`
+3. `AI Health OS - Agent 3 Script Writer V1.1`
+4. `AI Health OS - Agent 4 Visual Director V1.1`
+5. `AI Health OS - Agent 5 Voiceover & Subtitle Producer V1.1`
+6. `AI Health OS - Agent 6 Publishing Package & Analytics V1.1`
+
+总控流程固定为：`Master Input → Agent 1 → Agent 2 → Agent 3 → Agent 4 → Agent 5 → Agent 6 → Final Report`。每个 Agent 后都有 Success Check；失败会进入统一 `Unified Error Report`，不会继续调用后续 Agent。最终 `AI Health OS Final Report` 会显示 Markdown 总报告、最终 JSON 和 Agent 6 的 Publishing Package。
