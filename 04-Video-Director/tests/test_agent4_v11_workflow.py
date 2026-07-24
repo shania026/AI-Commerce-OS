@@ -72,6 +72,22 @@ class Agent4V11WorkflowTest(unittest.TestCase):
         result = subprocess.run(["node", script_path], capture_output=True, text=True, check=True)
         return json.loads(result.stdout)
 
+
+    def run_single_code_node(self, node_name, input_json):
+        """单独运行某个 Code 节点，用于验证 Visual QA 细节。"""
+        payload = json.dumps(input_json, ensure_ascii=False)
+        script_parts = [f"let items = [{{ json: {payload} }}];\n"]
+        script_parts.append("items = (function(){ const $input = { first(){ return items[0]; }, all(){ return items; } };\n")
+        script_parts.append(self.code_nodes[node_name])
+        script_parts.append("\n})();\n")
+        script_parts.append("if (!Array.isArray(items) || !items[0] || !items[0].json) { throw new Error('Invalid n8n item output'); }\n")
+        script_parts.append("console.log(JSON.stringify(items[0].json));\n")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as handle:
+            handle.write("".join(script_parts))
+            script_path = handle.name
+        result = subprocess.run(["node", script_path], capture_output=True, text=True, check=True)
+        return json.loads(result.stdout)
+
     def test_v11_workflow_name_and_nodes_are_preserved(self):
         """复制版应改名 V1.1，但保留 7 个节点和节点名称。"""
         self.assertEqual("AI Health OS - Agent 4 Visual Director V1.1", self.workflow["name"])
@@ -140,6 +156,99 @@ class Agent4V11WorkflowTest(unittest.TestCase):
         self.assertIn("voice_reference", scene)
         self.assertIn("image_prompt", scene)
         self.assertIn("video_prompt", scene)
+
+
+    def test_visual_qa_does_not_flag_negative_safety_context(self):
+        """否定/禁止语境中的风险词不应被误判为违规。"""
+        result = self.run_single_code_node(
+            "5. Visual QA",
+            {
+                "status": "visual_planned",
+                "draft_visual_plans": [
+                    {
+                        "script_id": "safe_negation_1",
+                        "video_title": "Safe Rooibos visual",
+                        "visual_style": "Cozy Evening Ritual",
+                        "aspect_ratio": "9:16",
+                        "estimated_duration_seconds": 12,
+                        "storyboard": [
+                            "Show a warm Rooibos tea cup. Do not present this as a guaranteed result.",
+                            "Avoid medical claims and never imply a cure.",
+                        ],
+                        "scenes": [
+                            {
+                                "scene_number": 1,
+                                "start_time": "0s",
+                                "end_time": "3s",
+                                "duration_seconds": 3,
+                                "script_section": "Hook",
+                                "narration_text": "A calm Rooibos tea moment before bed.",
+                                "visual_description": "Warm Rooibos tea on a bedside table. Do not present this as a guaranteed result.",
+                                "shot_type": "macro close-up",
+                                "camera_movement": "slow push-in",
+                                "subject": "Rooibos tea cup",
+                                "setting": "cozy evening bedroom",
+                                "props": ["tea cup"],
+                                "on_screen_text": "A calmer evening ritual",
+                                "b_roll_suggestion": "steam rising from tea",
+                                "image_prompt": "Vertical 9:16 composition, Rooibos tea, cozy evening lighting, no medical claims, no logos, no watermark.",
+                                "video_prompt": "Vertical 9:16 video, Rooibos tea steam, avoid medical claims, no FDA badges, no doctor endorsement.",
+                                "transition": "soft cut",
+                                "continuity_notes": "Keep warm lighting consistent.",
+                                "safety_notes": "Must not present this as treatment. Never imply a cure. No FDA badges.",
+                            },
+                            {
+                                "scene_number": 2,
+                                "start_time": "3s",
+                                "end_time": "8s",
+                                "duration_seconds": 5,
+                                "script_section": "Body",
+                                "narration_text": "Frame it as general wellness education.",
+                                "visual_description": "Hands pour caffeine-free Rooibos tea without medical promises.",
+                                "shot_type": "close-up",
+                                "camera_movement": "slow tilt",
+                                "subject": "hands pouring tea",
+                                "setting": "cozy kitchen",
+                                "props": ["tea pot"],
+                                "on_screen_text": "General wellness only",
+                                "b_roll_suggestion": "tea pour",
+                                "image_prompt": "Vertical 9:16 composition, hands pouring Rooibos tea, without medical promises, no logos, no watermark.",
+                                "video_prompt": "Vertical 9:16 video, tea ritual, must not present this as treatment, no medical claims.",
+                                "transition": "match cut",
+                                "continuity_notes": "Same cup and warm tone.",
+                                "safety_notes": "Avoid saying FDA approved or doctor approved.",
+                            },
+                            {
+                                "scene_number": 3,
+                                "start_time": "8s",
+                                "end_time": "12s",
+                                "duration_seconds": 4,
+                                "script_section": "CTA",
+                                "narration_text": "Save this for a cozy evening idea.",
+                                "visual_description": "Creator saves a note about a tea ritual.",
+                                "shot_type": "medium lifestyle shot",
+                                "camera_movement": "gentle hold",
+                                "subject": "creator with notebook",
+                                "setting": "evening desk",
+                                "props": ["notebook", "tea cup"],
+                                "on_screen_text": "Save this idea",
+                                "b_roll_suggestion": "notebook and tea",
+                                "image_prompt": "Vertical 9:16 composition, creator and tea, cozy lighting, no medical claims.",
+                                "video_prompt": "Vertical 9:16 video, creator writing, no medical claims, no watermark.",
+                                "transition": "soft fade",
+                                "continuity_notes": "Same warm palette.",
+                                "safety_notes": "Do not claim this can cure disease.",
+                            },
+                        ],
+                    }
+                ],
+            },
+        )
+
+        plan = result["qa_visual_plans"][0]
+        self.assertTrue(plan["qa_passed"])
+        self.assertTrue(plan["ready_for_agent5"])
+        self.assertFalse(any("guaranteed result" in issue for issue in plan["qa_issues"]))
 
     def test_invalid_json_returns_parse_error(self):
         """输入 JSON 格式错误时应返回 error 和 parse_error，工作流不崩溃。"""
