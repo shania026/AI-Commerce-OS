@@ -398,4 +398,4 @@ AI Health OS - Master Orchestrator Agent 1-6 V1.0
 
 ### Form 提交保护
 
-Master Orchestrator 的 `Execute Agent 1` 到 `Execute Agent 6` 节点已开启失败继续输出：如果某个子工作流名称、ID、触发方式或输入映射异常，Form 不会直接显示 “Problem submitting response”，而是进入统一 `Unified Error Report`，明确显示失败 Agent、失败步骤、错误信息和建议检查项。
+Master Orchestrator 的 `Execute Agent 1` 到 `Execute Agent 6` 节点已明确设置 `source = database` 并开启失败继续输出：如果某个子工作流名称、ID、触发方式或输入映射异常，Form 不会直接显示 “Problem submitting response”，而是进入统一 `Unified Error Report`，明确显示失败 Agent、失败步骤、错误信息和建议检查项。

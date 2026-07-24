@@ -81,6 +81,7 @@ class MasterOrchestratorWorkflowTest(unittest.TestCase):
         execute_nodes = [node for node in self.workflow["nodes"] if node["type"] == "n8n-nodes-base.executeWorkflow"]
         self.assertEqual(6, len(execute_nodes))
         for node in execute_nodes:
+            self.assertEqual("database", node["parameters"].get("source"), msg=node["name"])
             self.assertTrue(node.get("continueOnFail"), msg=node["name"])
             self.assertTrue(node.get("alwaysOutputData"), msg=node["name"])
             self.assertEqual("continueRegularOutput", node.get("onError"), msg=node["name"])

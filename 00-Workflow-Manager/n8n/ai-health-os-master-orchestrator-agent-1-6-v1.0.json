@@ -100,7 +100,8 @@
         "options": {
           "waitForSubWorkflow": true,
           "includeInputData": true
-        }
+        },
+        "source": "database"
       },
       "id": "exec-1",
       "name": "Execute Agent 1",
@@ -184,7 +185,8 @@
         "options": {
           "waitForSubWorkflow": true,
           "includeInputData": true
-        }
+        },
+        "source": "database"
       },
       "id": "exec-2",
       "name": "Execute Agent 2",
@@ -268,7 +270,8 @@
         "options": {
           "waitForSubWorkflow": true,
           "includeInputData": true
-        }
+        },
+        "source": "database"
       },
       "id": "exec-3",
       "name": "Execute Agent 3",
@@ -352,7 +355,8 @@
         "options": {
           "waitForSubWorkflow": true,
           "includeInputData": true
-        }
+        },
+        "source": "database"
       },
       "id": "exec-4",
       "name": "Execute Agent 4",
@@ -436,7 +440,8 @@
         "options": {
           "waitForSubWorkflow": true,
           "includeInputData": true
-        }
+        },
+        "source": "database"
       },
       "id": "exec-5",
       "name": "Execute Agent 5",
@@ -520,7 +525,8 @@
         "options": {
           "waitForSubWorkflow": true,
           "includeInputData": true
-        }
+        },
+        "source": "database"
       },
       "id": "exec-6",
       "name": "Execute Agent 6",
