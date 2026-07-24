@@ -171,6 +171,36 @@ class Agent5V11WorkflowTest(unittest.TestCase):
         self.assertIn("pacing_notes", package)
         self.assertIn("subtitle_qa", package)
 
+
+    def test_subtitle_qa_allows_negative_safety_context(self):
+        """Subtitle QA 不应把否定/安全提醒中的 guaranteed result 误判为违规。"""
+        sample = json.loads(json.dumps(REAL_AGENT4_ROOIBOS_OUTPUT))
+        sample[0]["visual_plans"][0]["scenes"][1]["narration_text"] = (
+            "Do not present this as medical advice, treatment, dosage guidance, or a guaranteed result."
+        )
+        sample[0]["visual_plans"][0]["scenes"][2]["narration_text"] = (
+            "Avoid saying FDA approved and never imply a cure."
+        )
+
+        result = self.run_code_sequence(
+            {"agent4_json": json.dumps(sample)},
+            [
+                "2. 标准化 Agent4 JSON",
+                "3. 筛选 ready_for_agent5",
+                "4. Voiceover Producer",
+                "5. Subtitle QA",
+                "6. JSON + Markdown",
+            ],
+        )
+
+        self.assertEqual("success", result["status"])
+        self.assertEqual(1, result["handoff"]["ready_count"])
+        package = result["voiceover_packages"][0]
+        self.assertTrue(package["ready_for_agent6"])
+        self.assertTrue(package["subtitle_qa"]["passed"])
+        self.assertGreaterEqual(package["subtitle_qa"]["qa_score"], 90)
+        self.assertFalse(any("guaranteed result" in issue.lower() for issue in package["qa_issues"]))
+
     def test_ready_for_agent5_truthy_values_are_supported(self):
         """Node 3 应支持 true、字符串 true/Yes/yes 和数字 1。"""
         for value in [True, "true", "Yes", "yes", 1]:
