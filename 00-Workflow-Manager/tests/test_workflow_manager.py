@@ -167,6 +167,29 @@ class WorkflowManagerTest(unittest.TestCase):
         self.assertIn("1. Agent5 输入", workflow["connections"])
 
 
+    def test_agent5_v11_is_registered_but_original_agent5_remains(self):
+        """Agent 5 V1.1 作为 Agent 4 V1.1 兼容复制版登记，原 v0.1 DEV 仍保留。"""
+        original = workflow_manager.AGENT_REGISTRY["agent5"]
+        compatible = workflow_manager.AGENT_REGISTRY["agent5_v11"]
+
+        self.assertIn("ai-health-os-agent5-voiceover-subtitle-producer-v0.1-dev.json", str(original.script_path))
+        self.assertFalse(compatible.enabled_for_cli)
+        self.assertIn("Agent 4 V1.1", compatible.description)
+        self.assertIn("ai-health-os-agent5-voiceover-subtitle-producer-v1.1.json", str(compatible.script_path))
+
+        with self.assertRaises(ValueError):
+            workflow_manager.run_agent("agent5_v11", limit=5)
+
+    def test_agent5_v11_n8n_workflow_is_compatible_copy(self):
+        """Agent 5 V1.1 复制版应保持 7 个节点。"""
+        workflow_path = Path(workflow_manager.AGENT_REGISTRY["agent5_v11"].script_path)
+        workflow = json.loads(workflow_path.read_text())
+
+        self.assertEqual("AI Health OS - Agent 5 Voiceover & Subtitle Producer V1.1", workflow["name"])
+        self.assertEqual(7, len(workflow["nodes"]))
+        self.assertIn("1. Agent5 输入", workflow["connections"])
+
+
     def test_agent6_is_registered_but_not_auto_runnable(self):
         """Agent 6 v0.1 DEV 只登记交接信息，不能被 Workflow Manager 自动调度。"""
         agent = workflow_manager.AGENT_REGISTRY["agent6"]

@@ -35,3 +35,13 @@ AI Health OS - Agent 5 Voiceover & Subtitle Producer v0.1 DEV
 ## 注意
 
 Agent 5 只生成文字层面的配音稿、字幕、SRT 和 TTS Prompt，不实际生成音频。当前不要开发 Agent 6。
+
+## Agent 5 V1.1（Agent 4 V1.1 兼容复制版）
+
+原始 Agent 5 v0.1 DEV 工作流保留不变。为兼容上游 `AI Health OS - Agent 4 Visual Director V1.1` 的真实输出，新增复制版：
+
+```text
+05-Voiceover-Subtitle-Producer/n8n/ai-health-os-agent5-voiceover-subtitle-producer-v1.1.json
+```
+
+V1.1 只增强前端输入解析与筛选兼容：能够从外层数组、对象、JSON 字符串或 Markdown fenced JSON 中读取 `visual_plans[]`，并筛选 `ready_for_agent5 = true` 的视觉方案。旁白生成、字幕生成、SRT、Subtitle QA、Markdown 报告和 `handoff.next_agent = agent_6` 结构保持不变，同时补充 `voiceover_script`、`narration_segments`、`subtitle_segments`、`pacing_notes` 和 `subtitle_qa` 兼容字段。

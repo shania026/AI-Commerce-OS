@@ -104,6 +104,15 @@ AGENT_REGISTRY: Dict[str, AgentSpec] = {
         description="配音字幕生产 Agent（v0.1 DEV）：接收 Agent 4 中 ready_for_agent5 = true 的视觉方案，生成英文配音稿、分句字幕、SRT、配音节奏和 TTS Prompt，并将合格结果交给 Agent 6。",
         enabled_for_cli=False,
     ),
+    "agent5_v11": AgentSpec(
+        name="agent5_v11",
+        script_path=REPO_ROOT / "05-Voiceover-Subtitle-Producer" / "n8n" / "ai-health-os-agent5-voiceover-subtitle-producer-v1.1.json",
+        default_input_path=OUTPUTS_DIR / "agent4_visual_project_results_v1.1.json",
+        default_output_path=OUTPUTS_DIR / "agent5_voiceover_subtitle_results_v1.1.json",
+        default_report_path=REPORTS_DIR / "agent5_voiceover_subtitle_report_v1.1.md",
+        description="配音字幕生产 Agent（V1.1）：兼容 Agent 4 V1.1 visual_plans 输出，生成英文配音稿、分句字幕、SRT、配音节奏和 TTS Prompt，并将合格结果交给 Agent 6。",
+        enabled_for_cli=False,
+    ),
     "agent6": AgentSpec(
         name="agent6",
         script_path=REPO_ROOT / "06-Publishing-Package-Analytics" / "n8n" / "ai-health-os-agent6-publishing-package-analytics-v0.1-dev.json",
