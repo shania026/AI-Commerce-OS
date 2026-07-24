@@ -362,3 +362,13 @@ Agent 6 已作为独立 n8n 工作流创建：
 5. 人工确认后再决定是否手动发布。
 
 当前不要开发 Agent 7。
+
+## Agent 2 V1.1（Agent E 兼容复制版）
+
+原始 Agent 2 V1.0 工作流保留不变。为兼容上游 `AI Health OS Agent E Memory Analysis V1.0` 的真实输出，新增复制版：
+
+```text
+00-Workflow-Manager/n8n/ai-health-os-agent2-compliance-rewriter-v1.1.json
+```
+
+V1.1 只修复第 2、3 节点的接口兼容，并把最终 `source_agent` 更新为 `agent_e`；健康声明风险检查、合规安全改写、Markdown 报告和 handoff 结构保持不变。

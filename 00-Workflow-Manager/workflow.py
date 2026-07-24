@@ -59,6 +59,15 @@ AGENT_REGISTRY: Dict[str, AgentSpec] = {
         description="健康合规改写 Agent（V1.0）：接收人工确认后的 Agent 1 选题，完成健康声明风险检查、安全改写，并输出 JSON 和 Markdown 报告。",
         enabled_for_cli=False,
     ),
+    "agent2_v11": AgentSpec(
+        name="agent2_v11",
+        script_path=REPO_ROOT / "00-Workflow-Manager" / "n8n" / "ai-health-os-agent2-compliance-rewriter-v1.1.json",
+        default_input_path=OUTPUTS_DIR / "agent_e_ranked_topics.json",
+        default_output_path=OUTPUTS_DIR / "agent2_compliance_results_v1.1.json",
+        default_report_path=REPORTS_DIR / "agent2_compliance_report_v1.1.md",
+        description="健康合规改写 Agent（V1.1）：兼容 Agent E Memory Analysis V1.0 ranked_topics 输出，保留人工确认后进行健康声明风险检查、安全改写，并输出 JSON 和 Markdown 报告。",
+        enabled_for_cli=False,
+    ),
     "agent4": AgentSpec(
         name="agent4",
         script_path=REPO_ROOT / "04-Video-Director" / "n8n" / "ai-health-os-agent4-visual-director-v0.1-dev.json",
