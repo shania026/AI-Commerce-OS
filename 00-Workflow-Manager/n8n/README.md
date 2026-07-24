@@ -395,3 +395,7 @@ AI Health OS - Master Orchestrator Agent 1-6 V1.0
 6. `AI Health OS - Agent 6 Publishing Package & Analytics V1.1`
 
 总控流程固定为：`Master Input → Agent 1 → Agent 2 → Agent 3 → Agent 4 → Agent 5 → Agent 6 → Final Report`。每个 Agent 后都有 Success Check；失败会进入统一 `Unified Error Report`，不会继续调用后续 Agent。最终 `AI Health OS Final Report` 会显示 Markdown 总报告、最终 JSON 和 Agent 6 的 Publishing Package。
+
+### Form 提交保护
+
+Master Orchestrator 的 `Execute Agent 1` 到 `Execute Agent 6` 节点已开启失败继续输出：如果某个子工作流名称、ID、触发方式或输入映射异常，Form 不会直接显示 “Problem submitting response”，而是进入统一 `Unified Error Report`，明确显示失败 Agent、失败步骤、错误信息和建议检查项。

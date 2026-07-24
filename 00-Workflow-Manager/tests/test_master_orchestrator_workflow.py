@@ -75,6 +75,24 @@ class MasterOrchestratorWorkflowTest(unittest.TestCase):
             result = subprocess.run(["node", "--check", script_path], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, msg=f"{node_name}: {result.stderr}")
 
+
+    def test_execute_workflow_nodes_continue_to_error_report_on_failure(self):
+        """Execute Workflow 子流程失败时不能让 Form 直接提交失败，应进入统一 Error Report。"""
+        execute_nodes = [node for node in self.workflow["nodes"] if node["type"] == "n8n-nodes-base.executeWorkflow"]
+        self.assertEqual(6, len(execute_nodes))
+        for node in execute_nodes:
+            self.assertTrue(node.get("continueOnFail"), msg=node["name"])
+            self.assertTrue(node.get("alwaysOutputData"), msg=node["name"])
+            self.assertEqual("continueRegularOutput", node.get("onError"), msg=node["name"])
+
+    def test_normalize_execute_workflow_error_routes_to_failed_status(self):
+        """Execute Workflow 报错对象应被标准化成 failed，而不是让工作流启动即终止。"""
+        result = self.run_code_node("Normalize Agent 1 Output", {"error": {"message": "Workflow could not be started"}})
+
+        self.assertFalse(result["success"])
+        self.assertEqual("agent_1", result["failed_agent"])
+        self.assertIn("Workflow could not be started", result["error_message"])
+
     def test_prepare_agent_inputs_pass_full_previous_json(self):
         agent2_input = self.run_code_node(
             "Prepare Agent 2 Input",
