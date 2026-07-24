@@ -122,6 +122,15 @@ AGENT_REGISTRY: Dict[str, AgentSpec] = {
         description="发布素材包与数据分析 Agent（v0.1 DEV）：接收 Agent 5 中 ready_for_agent6 = true 的内容，生成多平台 Caption、标题、CTA、Hashtags、SEO、发布时间建议、发布检查清单、Analytics Template 和 A/B Test Plan。",
         enabled_for_cli=False,
     ),
+    "agent6_v11": AgentSpec(
+        name="agent6_v11",
+        script_path=REPO_ROOT / "06-Publishing-Package-Analytics" / "n8n" / "ai-health-os-agent6-publishing-package-analytics-v1.1.json",
+        default_input_path=OUTPUTS_DIR / "agent5_voiceover_subtitle_results_v1.1.json",
+        default_output_path=OUTPUTS_DIR / "agent6_publishing_package_results_v1.1.json",
+        default_report_path=REPORTS_DIR / "agent6_publishing_package_report_v1.1.md",
+        description="发布素材包与数据分析 Agent（V1.1）：兼容 Agent 5 V1.1 voiceover_packages 输出，生成多平台 Caption、标题、CTA、Hashtags、SEO、发布时间建议、发布检查清单、Analytics Template 和 A/B Test Plan。",
+        enabled_for_cli=False,
+    ),
 }
 
 
@@ -180,7 +189,7 @@ def print_summary(completed_agents: List[AgentSpec]) -> None:
         print(f"- 已完成：{agent.name}｜{agent.description}")
         print(f"  JSON 输出：{agent.default_output_path}")
         print(f"  Markdown 报告：{agent.default_report_path}")
-    print("\n下一步：请先查看 Reports 里的决策报告；如需合规改写，请人工确认选题后使用 Agent 2 V1.0 独立 n8n 工作流；如需视觉方案，请在 Agent 3 人工确认后使用 Agent 4 独立 n8n 工作流；如需配音字幕，请在 Agent 4 人工确认后使用 Agent 5 v0.1 DEV 独立 n8n 工作流；如需发布素材包，请在 Agent 5 人工确认后使用 Agent 6 v0.1 DEV 独立 n8n 工作流。不要开发 Agent 7。")
+    print("\n下一步：请先查看 Reports 里的决策报告；如需合规改写，请人工确认选题后使用 Agent 2 V1.0 独立 n8n 工作流；如需视觉方案，请在 Agent 3 人工确认后使用 Agent 4 独立 n8n 工作流；如需配音字幕，请在 Agent 4 人工确认后使用 Agent 5 v0.1 DEV 独立 n8n 工作流；如需发布素材包，请在 Agent 5 人工确认后使用 Agent 6 v0.1 DEV 或 V1.1 兼容版独立 n8n 工作流。不要开发 Agent 7。")
 
 
 def build_parser() -> argparse.ArgumentParser:

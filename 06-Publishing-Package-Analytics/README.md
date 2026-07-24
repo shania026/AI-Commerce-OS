@@ -4,6 +4,19 @@ Agent 6 是独立的发布素材包与数据分析模板工作流。
 
 它接收 Agent 5 输出中 `ready_for_agent6 = true` 的内容，为每条视频生成 TikTok / Instagram / YouTube Shorts 发布文案、标题、封面文字、CTA、Hashtags、SEO Keywords、建议发布时间、发布检查清单、Analytics Template 和 A/B Test Plan。
 
+
+## V1.1 兼容版
+
+- Version：V1.1
+- Status：Compatibility Release
+- 新工作流文件：`06-Publishing-Package-Analytics/n8n/ai-health-os-agent6-publishing-package-analytics-v1.1.json`
+- 新工作流名称：`AI Health OS - Agent 6 Publishing Package & Analytics V1.1`
+- 兼容 Agent 5 V1.1 真实输出中的 `voiceover_packages[]`。
+- 支持 JSON Array、JSON Object、JSON String 和 Markdown JSON。
+- `ready_for_agent6` 支持 `true`、`"true"`、`"Yes"`、`"yes"` 和 `1`。
+
+V1.1 保留 Publishing Package、Caption Generator、Hashtag Generator、SEO、CTA、Cover Text、Publishing Checklist、Analytics Template、A/B Test、JSON Output 和 Markdown Report 等原有功能。
+
 ## 当前状态
 
 - Version：v0.1 DEV

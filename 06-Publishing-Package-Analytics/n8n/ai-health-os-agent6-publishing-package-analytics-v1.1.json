@@ -1,0 +1,194 @@
+{
+  "name": "AI Health OS - Agent 6 Publishing Package & Analytics V1.1",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "AI Health OS - Agent 6 Publishing Package & Analytics V1.1",
+        "formDescription": "粘贴 Agent 5 输出 JSON。Agent 6 只处理 ready_for_agent6 = true 的内容，生成发布文案包、检查清单、分析模板和 A/B 测试计划；不自动发布、不上传、不买广告、不回复评论、不开发 Agent 7。",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "agent5_json",
+              "fieldType": "textarea",
+              "requiredField": true,
+              "placeholder": "请粘贴 Agent 5 输出的完整 JSON。"
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "path": "ai-health-os-agent6-publishing-package-v11"
+        }
+      },
+      "id": "a6-form-input",
+      "name": "1. Agent6 输入",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -1340,
+        220
+      ],
+      "webhookId": "agent6-publishing-v11-input"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawInput = $input.first()?.json || {};\nlet rawAgent5Json = rawInput.agent5_json ?? rawInput['Agent 5 JSON 结果'] ?? rawInput.data ?? rawInput.json ?? '';\n\n// 支持用户直接粘贴 JSON、对象、数组或 Markdown JSON 代码块。\nfunction stripMarkdownFence(value) {\n  const textValue = typeof value === 'string' ? value.trim() : value;\n  if (typeof textValue !== 'string') return textValue;\n  return textValue.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```$/i, '').trim();\n}\n\nfunction parseJsonLike(value) {\n  const unfenced = stripMarkdownFence(value);\n  if (typeof unfenced === 'string') return JSON.parse(unfenced);\n  return unfenced;\n}\n\n// Agent 5 V1.1 真实输出常见形态：[{ voiceover_packages: [...] }]。\n// 这里必须读取内部 voiceover_packages，而不是误把外层包装数组当作包列表。\nfunction findPackages(value) {\n  if (Array.isArray(value)) {\n    const nested = [];\n    for (const item of value) {\n      if (item && typeof item === 'object') {\n        const inner = findPackages(item);\n        if (inner.length > 0) nested.push(...inner);\n      }\n    }\n    return nested.length > 0 ? nested : value;\n  }\n  if (!value || typeof value !== 'object') return [];\n  const possibleKeys = ['voiceover_packages', 'voiceoverPackages', 'subtitle_packages', 'publishing_inputs', 'packages', 'results', 'records'];\n  for (const key of possibleKeys) {\n    if (Array.isArray(value[key])) return value[key];\n  }\n  return [value];\n}\n\nfunction text(value) { return String(value ?? '').trim(); }\nfunction normalizePackage(pkg, index) {\n  const narrationSegments = Array.isArray(pkg.narration_segments) ? pkg.narration_segments : (Array.isArray(pkg.voiceover_segments) ? pkg.voiceover_segments : []);\n  const subtitleSegments = Array.isArray(pkg.subtitle_segments) ? pkg.subtitle_segments : (Array.isArray(pkg.subtitles) ? pkg.subtitles : []);\n  return {\n    ...pkg,\n    package_id: text(pkg.package_id || pkg.voiceover_id || pkg.id || `agent5_package_${index + 1}`),\n    video_title: text(pkg.video_title || pkg.title || pkg.topic || pkg.source_title || `Untitled Package ${index + 1}`),\n    full_voiceover_script: text(pkg.full_voiceover_script || pkg.voiceover_script || pkg.voiceover || pkg.script || ''),\n    voiceover_script: text(pkg.voiceover_script || pkg.full_voiceover_script || pkg.voiceover || pkg.script || ''),\n    narration_segments: narrationSegments,\n    subtitle_segments: subtitleSegments,\n    srt: text(pkg.srt || ''),\n    tts_prompt: text(pkg.tts_prompt || ''),\n    pacing_notes: text(pkg.pacing_notes || ''),\n    hashtags: Array.isArray(pkg.hashtags) ? pkg.hashtags : [],\n    ready_for_agent6: pkg.ready_for_agent6,\n    source_index: index + 1,\n  };\n}\n\ntry {\n  const parsed = parseJsonLike(rawAgent5Json);\n  const voiceover_packages = findPackages(parsed).map(normalizePackage).filter((pkg) => pkg.video_title);\n  return [{ json: { status: 'parsed', parse_error: '', source_agent: 'agent_5', voiceover_packages, total_voiceover_packages: voiceover_packages.length } }];\n} catch (error) {\n  return [{ json: { status: 'error', parse_error: `Agent 5 JSON 解析失败：${error.message}`, source_agent: 'agent_5', voiceover_packages: [], total_voiceover_packages: 0 } }];\n}"
+      },
+      "id": "a6-code-2",
+      "name": "2. 标准化 Agent5 JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nif (data.status === 'error') return [{ json: { ...data, publishing_input_packages: [], selected_count: 0 } }];\nfunction truthy(value) {\n  if (value === true || value === 1) return true;\n  const normalized = String(value ?? '').trim().toLowerCase();\n  return normalized === 'true' || normalized === 'yes' || normalized === '1';\n}\nconst selected = (Array.isArray(data.voiceover_packages) ? data.voiceover_packages : [])\n  .filter((pkg) => truthy(pkg.ready_for_agent6))\n  .slice(0, 5);\nreturn [{ json: { ...data, status: selected.length > 0 ? 'ready_for_publishing_package' : 'insufficient_data', publishing_input_packages: selected, selected_count: selected.length, selection_note: selected.length > 0 ? '已选择 ready_for_agent6 = true 的内容。' : '没有 ready_for_agent6 = true 的内容，Agent 6 不会生成发布包。' } }];"
+      },
+      "id": "a6-code-3",
+      "name": "3. 筛选 ready_for_agent6",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -900,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nif (data.status === 'error' || data.status === 'insufficient_data') return [{ json: { ...data, draft_publishing_packages: [] } }];\nfunction text(value) { return String(value ?? '').trim(); }\nfunction cleanTitle(value) {\n  const t = text(value).replace(/\\s+/g, ' ');\n  return t.length > 70 ? `${t.slice(0, 67)}...` : t;\n}\nfunction baseKeywords(pkg) {\n  const combined = `${pkg.video_title} ${pkg.full_voiceover_script}`.toLowerCase();\n  const words = ['wellness', 'healthy habits', 'short video', 'daily routine'];\n  if (combined.includes('tea')) words.push('tea routine', 'herbal tea');\n  if (combined.includes('rooibos')) words.push('rooibos', 'caffeine free tea');\n  if (combined.includes('evening') || combined.includes('night')) words.push('evening routine', 'night routine');\n  if (combined.includes('ginger')) words.push('ginger wellness');\n  return Array.from(new Set(words)).slice(0, 10);\n}\nfunction hashtags(pkg) {\n  const keys = baseKeywords(pkg);\n  const tags = ['#WellnessTok', '#HealthyHabits', '#Shorts'];\n  for (const key of keys) tags.push(`#${key.replace(/\\s+/g, '')}`);\n  return Array.from(new Set(tags)).slice(0, 8);\n}\nfunction buildPackage(pkg, index) {\n  const videoTitle = cleanTitle(pkg.video_title);\n  const hookLine = text(pkg.full_voiceover_script).split(/[.!?]/).map((x) => x.trim()).filter(Boolean)[0] || videoTitle;\n  const tags = hashtags(pkg);\n  const seo = baseKeywords(pkg);\n  const cta = 'Save this for your next wellness routine and follow for more simple health education.';\n  return {\n    publishing_id: `agent6_publish_${index + 1}`,\n    source_package_id: pkg.package_id,\n    video_title: videoTitle,\n    cover_text: cleanTitle(videoTitle).slice(0, 34),\n    tiktok_caption: `${hookLine}. ${cta}\\n\\n${tags.slice(0, 5).join(' ')}`,\n    instagram_caption: `${hookLine}.\\n\\n${cta}\\n\\n${tags.join(' ')}`,\n    youtube_shorts_caption: `${videoTitle} — quick wellness education. ${cta} ${tags.slice(0, 4).join(' ')}`,\n    cta,\n    hashtags: tags,\n    seo_keywords: seo,\n    suggested_posting_time: { timezone: 'US local time', primary: '7:00 PM', secondary: '12:00 PM', reason: 'Wellness and routine content often fits lunch breaks or evening wind-down behavior.' },\n    publishing_checklist: [\n      'Confirm final video matches approved script and visuals.',\n      'Confirm no high-risk medical promises, medication scenes, or outcome guarantees.',\n      'Confirm captions, cover text, hashtags, and CTA are accurate.',\n      'Confirm subtitles are readable on mobile.',\n      'Confirm product or affiliate disclosure is added if needed.',\n      'Confirm human review before posting.'\n    ],\n    analytics_template: { views: 0, hook_retention_3s: 0, average_watch_time_seconds: 0, completion_rate: 0, saves: 0, shares: 0, comments: 0, profile_visits: 0, link_clicks: 0, follows: 0, notes: '' },\n    ab_test_plan: [\n      { test_name: 'Hook wording', variant_a: hookLine, variant_b: `A simple wellness routine idea: ${videoTitle}`, success_metric: '3-second retention' },\n      { test_name: 'Cover text', variant_a: videoTitle.slice(0, 28), variant_b: 'Try this simple routine', success_metric: 'view-through rate' },\n      { test_name: 'CTA', variant_a: 'Save this for later.', variant_b: 'Follow for more simple wellness ideas.', success_metric: 'saves and follows' }\n    ],\n  };\n}\nconst draftPublishingPackages = (data.publishing_input_packages || []).map(buildPackage);\nreturn [{ json: { ...data, status: 'publishing_package_drafted', draft_publishing_packages: draftPublishingPackages } }];"
+      },
+      "id": "a6-code-4",
+      "name": "4. Publishing Package Builder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nif (data.status === 'error' || data.status === 'insufficient_data') return [{ json: { ...data, qa_publishing_packages: [] } }];\nconst riskyTerms = ['cure', 'treat', 'prevent disease', 'replace medication', 'stop medication', 'guaranteed result', 'FDA approved', 'clinically proven', '治愈', '治疗', '替代药物', '停止服药'];\nfunction text(value) { return String(value ?? '').trim(); }\nfunction findRisk(value) { const lower = text(value).toLowerCase(); return riskyTerms.filter((term) => lower.includes(term.toLowerCase())); }\nfunction qaPackage(pkg) {\n  const issues = [];\n  const corrections = [];\n  const fixed = { ...pkg };\n  const required = ['tiktok_caption', 'instagram_caption', 'youtube_shorts_caption', 'video_title', 'cover_text', 'cta'];\n  for (const field of required) {\n    if (!text(fixed[field])) { fixed[field] = field === 'cta' ? 'Save this and follow for more wellness education.' : fixed.video_title || 'Wellness video'; corrections.push(`补充 ${field}。`); }\n  }\n  if (!Array.isArray(fixed.hashtags) || fixed.hashtags.length < 3) { fixed.hashtags = ['#WellnessTok', '#HealthyHabits', '#Shorts']; corrections.push('补充 Hashtags。'); }\n  if (!Array.isArray(fixed.seo_keywords) || fixed.seo_keywords.length < 3) { fixed.seo_keywords = ['wellness', 'healthy habits', 'short video']; corrections.push('补充 SEO Keywords。'); }\n  if (!Array.isArray(fixed.publishing_checklist) || fixed.publishing_checklist.length < 3) { fixed.publishing_checklist = ['Confirm script safety.', 'Confirm subtitles.', 'Human review before posting.']; corrections.push('补充 Publishing Checklist。'); }\n  if (!fixed.analytics_template || typeof fixed.analytics_template !== 'object') { fixed.analytics_template = { views: 0, saves: 0, shares: 0, comments: 0, notes: '' }; corrections.push('补充 Analytics Template。'); }\n  if (!Array.isArray(fixed.ab_test_plan) || fixed.ab_test_plan.length < 2) { fixed.ab_test_plan = [{ test_name: 'Caption hook', variant_a: fixed.tiktok_caption, variant_b: fixed.video_title, success_metric: '3-second retention' }, { test_name: 'CTA', variant_a: 'Save this.', variant_b: 'Follow for more.', success_metric: 'saves and follows' }]; corrections.push('补充 A/B Test Plan。'); }\n  if (text(fixed.cover_text).length > 40) { fixed.cover_text = text(fixed.cover_text).slice(0, 37) + '...'; corrections.push('缩短 Cover Text。'); }\n  if (text(fixed.tiktok_caption).length > 2200) { fixed.tiktok_caption = text(fixed.tiktok_caption).slice(0, 2197) + '...'; corrections.push('缩短 TikTok Caption。'); }\n  const risk = findRisk(JSON.stringify(fixed));\n  if (risk.length > 0) issues.push(`发布文案包中出现高风险健康表达：${Array.from(new Set(risk)).join(', ')}。`);\n  const qaScore = Math.max(0, 100 - issues.length * 30 - corrections.length * 3 - risk.length * 10);\n  const passed = issues.length === 0 && required.every((field) => text(fixed[field])) && fixed.hashtags.length >= 3;\n  return { ...fixed, qa_passed: passed, qa_score: qaScore, qa_issues: issues, corrections_made: corrections, ready_for_manual_publish: passed };\n}\nconst qaPublishingPackages = (data.draft_publishing_packages || []).map((pkg) => { try { return qaPackage(pkg); } catch (error) { return { ...pkg, qa_passed: false, qa_score: 0, qa_issues: [`单条发布包 QA 失败：${error.message}`], corrections_made: [], ready_for_manual_publish: false }; } });\nreturn [{ json: { ...data, status: 'qa_complete', qa_publishing_packages: qaPublishingPackages } }];"
+      },
+      "id": "a6-code-5",
+      "name": "5. Publishing QA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -460,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nconst generatedAt = new Date().toISOString();\nconst disclaimer = '本工具仅生成发布文案包、发布检查清单、分析模板和 A/B 测试计划，不自动发布、不自动上传、不购买广告、不自动回复评论，也不构成医疗、法律或平台合规意见。最终发布前仍需人工审核。';\nfunction buildReport(status, packages, parseError) {\n  const ready = packages.filter((pkg) => pkg.ready_for_manual_publish);\n  const failed = packages.filter((pkg) => !pkg.ready_for_manual_publish);\n  const lines = ['# AI Health OS — Agent 6 Publishing Package & Analytics Report', '', '## 一、本次处理结果', '', `- 状态：${status}`, `- 本次处理配音字幕包数量：${packages.length}`, `- 可人工发布：${ready.length}`, `- 未通过 Publishing QA：${failed.length}`];\n  if (parseError) lines.push(`- 解析错误：${parseError}`);\n  lines.push('', '## 二、可人工发布的内容包', '', ready.length ? ready.map((pkg) => `- ${pkg.video_title}｜QA ${pkg.qa_score} 分｜ready_for_manual_publish = true`).join('\\n') : '- 暂无。');\n  lines.push('', '## 三、需要人工复核或未通过 QA 的内容', '', failed.length ? failed.map((pkg) => `- ${pkg.video_title}｜问题：${(pkg.qa_issues || []).join('；') || '未通过 QA'}`).join('\\n') : '- 暂无。');\n  lines.push('', '## 四、逐条发布包', '');\n  for (const pkg of packages) {\n    lines.push(`### ${pkg.video_title}`, '', `- Cover Text：${pkg.cover_text}`, `- CTA：${pkg.cta}`, `- Suggested Posting Time：${pkg.suggested_posting_time?.primary || ''} / ${pkg.suggested_posting_time?.secondary || ''}`, `- QA：${pkg.qa_passed ? '通过' : '未通过'}（${pkg.qa_score} 分）`, '', '#### TikTok Caption', '', pkg.tiktok_caption || '', '', '#### Instagram Caption', '', pkg.instagram_caption || '', '', '#### YouTube Shorts Caption', '', pkg.youtube_shorts_caption || '', '', `#### Hashtags\\n\\n${(pkg.hashtags || []).join(' ')}`, '', `#### SEO Keywords\\n\\n${(pkg.seo_keywords || []).join(', ')}`, '', '#### Publishing Checklist', '');\n    for (const item of pkg.publishing_checklist || []) lines.push(`- ${item}`);\n    lines.push('', '#### Analytics Template', '', '```json', JSON.stringify(pkg.analytics_template || {}, null, 2), '```', '', '#### A/B Test Plan', '');\n    for (const test of pkg.ab_test_plan || []) lines.push(`- ${test.test_name}：A=${test.variant_a}｜B=${test.variant_b}｜指标=${test.success_metric}`);\n    lines.push('');\n  }\n  lines.push('## 五、下一步', '', 'Agent 6 不会自动发布。请人工检查所有 caption、hashtags、SEO、CTA、封面文字和发布检查清单后，再决定是否手动发布。当前不要开发 Agent 7。', '', '## 重要说明', '', disclaimer);\n  return lines.join('\\n');\n}\nlet status = 'success';\nlet packages = Array.isArray(data.qa_publishing_packages) ? data.qa_publishing_packages : [];\nif (data.status === 'error') status = 'error';\nif (data.status === 'insufficient_data') status = 'insufficient_data';\nif (status !== 'success') packages = [];\nconst readyCount = packages.filter((pkg) => pkg.ready_for_manual_publish).length;\nconst failedCount = packages.filter((pkg) => !pkg.ready_for_manual_publish).length;\nconst manualReviewCount = packages.filter((pkg) => (pkg.corrections_made || []).length > 0 || (pkg.qa_issues || []).length > 0).length;\nreturn [{ json: { workflow: 'AI Health OS', source_agent: 'agent_5', agent: 'agent_6', version: '1.1', status, generated_at: generatedAt, total_voiceover_packages: packages.length, publishing_packages: packages, handoff: { next_agent: 'manual_publishing_or_future_agent_7', ready_count: readyCount, failed_qa_count: failedCount, manual_review_count: manualReviewCount }, disclaimer, parse_error: data.parse_error || '', report_markdown: buildReport(status, packages, data.parse_error || '') } }];"
+      },
+      "id": "a6-code-6",
+      "name": "6. JSON + Markdown",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Agent 6 Publishing Package & Analytics 报告",
+        "completionMessage": "={{ $json.report_markdown + '\\n\\n---\\n\\nJSON Publishing Package：\\n```json\\n' + JSON.stringify({ workflow: $json.workflow, source_agent: $json.source_agent, agent: $json.agent, version: $json.version, status: $json.status, generated_at: $json.generated_at, total_voiceover_packages: $json.total_voiceover_packages, publishing_packages: $json.publishing_packages, handoff: $json.handoff, disclaimer: $json.disclaimer }, null, 2) + '\\n```' }}",
+        "options": {}
+      },
+      "id": "a6-form-ending",
+      "name": "7. 显示报告",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        -20,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "1. Agent6 输入": {
+      "main": [
+        [
+          {
+            "node": "2. 标准化 Agent5 JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. 标准化 Agent5 JSON": {
+      "main": [
+        [
+          {
+            "node": "3. 筛选 ready_for_agent6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. 筛选 ready_for_agent6": {
+      "main": [
+        [
+          {
+            "node": "4. Publishing Package Builder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Publishing Package Builder": {
+      "main": [
+        [
+          {
+            "node": "5. Publishing QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Publishing QA": {
+      "main": [
+        [
+          {
+            "node": "6. JSON + Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. JSON + Markdown": {
+      "main": [
+        [
+          {
+            "node": "7. 显示报告",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "agent6-publishing-package-v01-dev",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "agent6-publishing-package-v01-dev",
+  "tags": []
+}
