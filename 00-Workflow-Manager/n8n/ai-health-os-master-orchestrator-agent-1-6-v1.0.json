@@ -91,29 +91,22 @@
     },
     {
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "AI Health OS Agent 1 Memory Analysis V1.0",
-          "mode": "name",
-          "cachedResultName": "AI Health OS Agent 1 Memory Analysis V1.0"
-        },
+        "workflowId": "AI Health OS - Agent 1 Memory Analysis V1.0",
         "options": {
           "waitForSubWorkflow": true,
           "includeInputData": true
-        },
-        "source": "database"
+        }
       },
       "id": "exec-1",
       "name": "Execute Agent 1",
       "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 2,
+      "typeVersion": 1,
       "position": [
         -2160,
         0
       ],
       "continueOnFail": true,
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput"
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -176,29 +169,22 @@
     },
     {
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "AI Health OS - Agent 2 Health Compliance Rewriter V1.1",
-          "mode": "name",
-          "cachedResultName": "AI Health OS - Agent 2 Health Compliance Rewriter V1.1"
-        },
+        "workflowId": "AI Health OS - Agent 2 Health Compliance Rewriter V1.1",
         "options": {
           "waitForSubWorkflow": true,
           "includeInputData": true
-        },
-        "source": "database"
+        }
       },
       "id": "exec-2",
       "name": "Execute Agent 2",
       "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 2,
+      "typeVersion": 1,
       "position": [
         -1280,
         0
       ],
       "continueOnFail": true,
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput"
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -261,29 +247,22 @@
     },
     {
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "AI Health OS - Agent 3 Script Writer V1.1",
-          "mode": "name",
-          "cachedResultName": "AI Health OS - Agent 3 Script Writer V1.1"
-        },
+        "workflowId": "AI Health OS - Agent 3 Script Writer V1.1",
         "options": {
           "waitForSubWorkflow": true,
           "includeInputData": true
-        },
-        "source": "database"
+        }
       },
       "id": "exec-3",
       "name": "Execute Agent 3",
       "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 2,
+      "typeVersion": 1,
       "position": [
         -2380,
         260
       ],
       "continueOnFail": true,
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput"
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -346,29 +325,22 @@
     },
     {
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "AI Health OS - Agent 4 Visual Director V1.1",
-          "mode": "name",
-          "cachedResultName": "AI Health OS - Agent 4 Visual Director V1.1"
-        },
+        "workflowId": "AI Health OS - Agent 4 Visual Director V1.1",
         "options": {
           "waitForSubWorkflow": true,
           "includeInputData": true
-        },
-        "source": "database"
+        }
       },
       "id": "exec-4",
       "name": "Execute Agent 4",
       "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 2,
+      "typeVersion": 1,
       "position": [
         -1500,
         260
       ],
       "continueOnFail": true,
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput"
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -431,29 +403,22 @@
     },
     {
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "AI Health OS - Agent 5 Voiceover & Subtitle Producer V1.1",
-          "mode": "name",
-          "cachedResultName": "AI Health OS - Agent 5 Voiceover & Subtitle Producer V1.1"
-        },
+        "workflowId": "AI Health OS - Agent 5 Voiceover & Subtitle Producer V1.1",
         "options": {
           "waitForSubWorkflow": true,
           "includeInputData": true
-        },
-        "source": "database"
+        }
       },
       "id": "exec-5",
       "name": "Execute Agent 5",
       "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 2,
+      "typeVersion": 1,
       "position": [
         -2380,
         520
       ],
       "continueOnFail": true,
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput"
+      "alwaysOutputData": true
     },
     {
       "parameters": {
@@ -516,29 +481,22 @@
     },
     {
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "AI Health OS - Agent 6 Publishing Package & Analytics V1.1",
-          "mode": "name",
-          "cachedResultName": "AI Health OS - Agent 6 Publishing Package & Analytics V1.1"
-        },
+        "workflowId": "AI Health OS - Agent 6 Publishing Package & Analytics V1.1",
         "options": {
           "waitForSubWorkflow": true,
           "includeInputData": true
-        },
-        "source": "database"
+        }
       },
       "id": "exec-6",
       "name": "Execute Agent 6",
       "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 2,
+      "typeVersion": 1,
       "position": [
         -1500,
         520
       ],
       "continueOnFail": true,
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput"
+      "alwaysOutputData": true
     },
     {
       "parameters": {

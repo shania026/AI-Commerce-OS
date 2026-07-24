@@ -46,7 +46,7 @@ class MasterOrchestratorWorkflowTest(unittest.TestCase):
 
     def test_execute_workflow_nodes_call_existing_agents_in_order(self):
         expected = [
-            "AI Health OS Agent 1 Memory Analysis V1.0",
+            "AI Health OS - Agent 1 Memory Analysis V1.0",
             "AI Health OS - Agent 2 Health Compliance Rewriter V1.1",
             "AI Health OS - Agent 3 Script Writer V1.1",
             "AI Health OS - Agent 4 Visual Director V1.1",
@@ -54,7 +54,7 @@ class MasterOrchestratorWorkflowTest(unittest.TestCase):
             "AI Health OS - Agent 6 Publishing Package & Analytics V1.1",
         ]
         actual = [
-            node["parameters"]["workflowId"]["value"]
+            node["parameters"]["workflowId"]
             for node in self.workflow["nodes"]
             if node["type"] == "n8n-nodes-base.executeWorkflow"
         ]
@@ -81,10 +81,10 @@ class MasterOrchestratorWorkflowTest(unittest.TestCase):
         execute_nodes = [node for node in self.workflow["nodes"] if node["type"] == "n8n-nodes-base.executeWorkflow"]
         self.assertEqual(6, len(execute_nodes))
         for node in execute_nodes:
-            self.assertEqual("database", node["parameters"].get("source"), msg=node["name"])
             self.assertTrue(node.get("continueOnFail"), msg=node["name"])
             self.assertTrue(node.get("alwaysOutputData"), msg=node["name"])
-            self.assertEqual("continueRegularOutput", node.get("onError"), msg=node["name"])
+            self.assertEqual(1, node.get("typeVersion"), msg=node["name"])
+            self.assertIsInstance(node["parameters"].get("workflowId"), str, msg=node["name"])
 
     def test_normalize_execute_workflow_error_routes_to_failed_status(self):
         """Execute Workflow 报错对象应被标准化成 failed，而不是让工作流启动即终止。"""

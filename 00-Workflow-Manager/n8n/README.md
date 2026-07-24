@@ -387,7 +387,7 @@ AI Health OS - Master Orchestrator Agent 1-6 V1.0
 
 该总控工作流不复制 Agent 1 到 Agent 6 的内部节点，而是使用 n8n 官方 `Execute Workflow` 节点串行调用已经测试通过的子工作流：
 
-1. `AI Health OS Agent 1 Memory Analysis V1.0`
+1. `AI Health OS - Agent 1 Memory Analysis V1.0`
 2. `AI Health OS - Agent 2 Health Compliance Rewriter V1.1`
 3. `AI Health OS - Agent 3 Script Writer V1.1`
 4. `AI Health OS - Agent 4 Visual Director V1.1`
@@ -398,4 +398,4 @@ AI Health OS - Master Orchestrator Agent 1-6 V1.0
 
 ### Form 提交保护
 
-Master Orchestrator 的 `Execute Agent 1` 到 `Execute Agent 6` 节点已明确设置 `source = database` 并开启失败继续输出：如果某个子工作流名称、ID、触发方式或输入映射异常，Form 不会直接显示 “Problem submitting response”，而是进入统一 `Unified Error Report`，明确显示失败 Agent、失败步骤、错误信息和建议检查项。
+Master Orchestrator 的 `Execute Agent 1` 到 `Execute Agent 6` 节点已改为当前 Docker 兼容性更高的标准 `Execute Workflow` v1 节点结构，并开启失败继续输出：如果某个子工作流名称、ID、触发方式或输入映射异常，Form 不会直接显示 “Problem submitting response”，而是进入统一 `Unified Error Report`，明确显示失败 Agent、失败步骤、错误信息和建议检查项。
