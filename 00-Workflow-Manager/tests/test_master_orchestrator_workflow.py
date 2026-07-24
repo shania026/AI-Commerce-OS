@@ -23,10 +23,12 @@ class MasterOrchestratorWorkflowTest(unittest.TestCase):
             if node["type"] == "n8n-nodes-base.code"
         }
 
-    def run_code_node(self, node_name, payload):
+    def run_code_node(self, node_name, payload, node_outputs=None):
         script = textwrap.dedent(
             f"""
             let items = [{{ json: {json.dumps(payload, ensure_ascii=False)} }}];
+            const nodeOutputs = {json.dumps(node_outputs or {}, ensure_ascii=False)};
+            function $(name) {{ return {{ first() {{ return {{ json: nodeOutputs[name] || {{}} }}; }} }}; }}
             items = (function(){{ const $input = {{ first(){{ return items[0]; }}, all(){{ return items; }} }};
             {self.code_nodes[node_name]}
             }})();
@@ -90,6 +92,36 @@ class MasterOrchestratorWorkflowTest(unittest.TestCase):
         self.assertEqual("agent_1", result["failed_agent"])
         self.assertIn("Workflow could not be started", result["error_message"])
 
+
+    def test_normalize_nodes_preserve_accumulated_master_state(self):
+        previous_state = {
+            "master_run_id": "master_rooibos_test",
+            "started_at": "2026-07-24T00:00:00.000Z",
+            "topic": "Rooibos Tea Before Bed",
+            "product_name": "FYNELA Rooibos Tea",
+            "target_platform": "TikTok",
+            "agent_1_output": {"status": "success", "ranked_topics": [{"title": "Rooibos Tea Before Bed"}]},
+            "agent_1_status": "success",
+        }
+        agent2_output = {
+            "status": "success",
+            "compliance_results": [{"ready_for_agent3": True}],
+            "handoff": {"ready_count": 1},
+        }
+
+        result = self.run_code_node(
+            "Normalize Agent 2 Output",
+            agent2_output,
+            {"Prepare Agent 2 Input": previous_state},
+        )
+
+        self.assertEqual("master_rooibos_test", result["master_run_id"])
+        self.assertEqual("Rooibos Tea Before Bed", result["topic"])
+        self.assertEqual("success", result["agent_1_status"])
+        self.assertEqual("success", result["agent_2_status"])
+        self.assertIn("agent_1_output", result)
+        self.assertIn("agent_2_output", result)
+
     def test_prepare_agent_inputs_pass_full_previous_json(self):
         agent2_input = self.run_code_node(
             "Prepare Agent 2 Input",
@@ -147,6 +179,13 @@ class MasterOrchestratorWorkflowTest(unittest.TestCase):
         result = self.run_code_node("Build Final Master Report", payload)
 
         self.assertEqual("success", result["status"])
+        self.assertEqual("master_rooibos_test", result["master_run_id"])
+        self.assertEqual("Rooibos Tea Before Bed", result["topic"])
+        self.assertEqual("Rooibos", result["product_name"])
+        self.assertEqual("TikTok", result["target_platform"])
+        self.assertEqual("success", result["agent_1_status"])
+        self.assertEqual("success", result["agent_6_status"])
+        self.assertNotEqual("0ms", result["total_processing_time"])
         self.assertTrue(result["ready_for_manual_publish"])
         self.assertEqual(1, len(result["final_publishing_packages"]))
         self.assertIn("# AI Health OS Master Orchestrator Report", result["report_markdown"])
