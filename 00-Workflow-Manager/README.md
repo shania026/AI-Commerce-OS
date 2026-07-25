@@ -1,0 +1,172 @@
+# 00-Workflow-Manager：AI Health OS 工作流管理器 MVP
+
+## 它负责什么？
+
+Workflow Manager 是 AI Health OS 的主框架。
+
+它不负责生成业务内容，也不负责写脚本、生成视频或发布内容。
+
+它只负责：
+
+1. 统一输入文件位置；
+2. 调度已经完成的 Agent；
+3. 把 Agent 输出统一保存到 Outputs；
+4. 把给产品经理看的报告统一保存到 Reports；
+5. 为后续 Agent 保留人工确认和交接入口。
+
+## 当前 MVP 做了什么？
+
+当前只调度一个已经完成的 Agent：
+
+```text
+Agent 1：健康选题发现 Agent
+```
+
+Workflow Manager 会读取：
+
+```text
+Inputs/health_topics.csv
+```
+
+然后生成：
+
+```text
+Outputs/agent1_ranked_health_topics.json
+Reports/agent1_decision_report.md
+```
+
+## 如何运行？
+
+在项目根目录运行：
+
+```bash
+python 00-Workflow-Manager/workflow.py --limit 5
+```
+
+运行完成后，请优先打开：
+
+```text
+Reports/agent1_decision_report.md
+```
+
+这份 Markdown 报告是给产品经理看的，比 JSON 更容易阅读。
+
+## 完整 Demo 教程
+
+如果你是第一次使用，请先看这份普通用户教程：
+
+```text
+00-Workflow-Manager/docs/demo-walkthrough.md
+```
+
+## n8n 可导入工作流
+
+如果你不想手动创建 n8n 节点，可以直接导入这个文件：
+
+```text
+00-Workflow-Manager/n8n/ai-health-os-daily-topic-workflow.json
+```
+
+导入和 Docker 路径说明请看：
+
+```text
+00-Workflow-Manager/n8n/README.md
+```
+
+这个导入版不使用 Execute Command 节点，避免部分 n8n Docker / n8n 2.x 环境显示 Unknown Node。
+
+## Agent 2 V1.0 发布说明
+
+Agent 2 V1.0 已正式发布。
+
+Agent 2 是独立 n8n 工作流，不会被 Workflow Manager 自动触发，仍然保留人工确认步骤。
+
+导入文件：
+
+```text
+00-Workflow-Manager/n8n/ai-health-os-agent2-compliance-rewriter-v1.0.json
+```
+
+Agent 2 V1.0 负责：
+
+- 接收 Agent 1 人工确认后的选题；
+- 完成健康声明风险检查；
+- 完成安全改写；
+- 输出 JSON 和 Markdown 报告；
+- 将可用选题交给 Agent 3。
+
+Agent 2 V1.0 不负责：
+
+- 写完整脚本；
+- 生成视频；
+- 发布内容；
+- 开发 Agent 3。
+
+## 注意
+
+当前主流程仍然只自动运行 Agent 1。
+
+请不要开发 Agent 5。
+
+## Agent 4 v0.1 DEV 预留说明
+
+Agent 4 Visual Director v0.1 DEV 已创建为独立 n8n 工作流，并已在 Workflow Manager 中登记接口。
+
+导入文件：
+
+```text
+04-Video-Director/n8n/ai-health-os-agent4-visual-director-v0.1-dev.json
+```
+
+Agent 4 负责接收 Agent 3 已通过 QA 的脚本，生成镜头规划、视觉执行方案、AI 图片 Prompt、AI 视频 Prompt 和 Markdown Visual Report。
+
+Agent 4 不会被 Workflow Manager 自动触发。必须先人工确认 Agent 3 的脚本，再单独运行 Agent 4 n8n 工作流。
+
+当前不要开发 Agent 5。
+
+## Agent 5 v0.1 DEV 预留说明
+
+Agent 5 Voiceover & Subtitle Producer v0.1 DEV 已创建为独立 n8n 工作流，并已在 Workflow Manager 中登记接口。
+
+导入文件：
+
+```text
+05-Voiceover-Subtitle-Producer/n8n/ai-health-os-agent5-voiceover-subtitle-producer-v0.1-dev.json
+```
+
+Agent 5 负责接收 Agent 4 中 `ready_for_agent5 = true` 的视觉方案，生成英文配音稿、分句配音、字幕、SRT、配音节奏、TTS Prompt 和 Markdown 报告。
+
+Agent 5 不会被 Workflow Manager 自动触发。必须先人工确认 Agent 4 的视觉方案，再单独运行 Agent 5 n8n 工作流。
+
+当前不要开发 Agent 6。
+
+## Agent 6 v0.1 DEV 预留说明
+
+Agent 6 Publishing Package & Analytics v0.1 DEV 已创建为独立 n8n 工作流，并已在 Workflow Manager 中登记接口。
+
+导入文件：
+
+```text
+06-Publishing-Package-Analytics/n8n/ai-health-os-agent6-publishing-package-analytics-v0.1-dev.json
+```
+
+Agent 6 负责接收 Agent 5 中 `ready_for_agent6 = true` 的内容，生成多平台 Caption、Video Title、Cover Text、CTA、Hashtags、SEO Keywords、Suggested Posting Time、Publishing Checklist、Analytics Template 和 A/B Test Plan。
+
+Agent 6 不会自动发布、上传、购买广告或回复评论。当前不要开发 Agent 7。
+
+
+## Master Orchestrator V1.0
+
+新增总控 n8n 工作流：
+
+```text
+00-Workflow-Manager/n8n/ai-health-os-master-orchestrator-agent-1-6-v1.0.json
+```
+
+导入后的名称：
+
+```text
+AI Health OS - Master Orchestrator Agent 1-6 V1.0
+```
+
+该工作流通过 n8n 官方 `Execute Workflow` 节点串行调用 Agent 1 到 Agent 6，并在每个 Agent 后增加 Success Check；失败时统一进入 Error Report，成功时输出最终 Markdown 报告和 Agent 6 的 Publishing Package。它不会自动发布、不会上传平台、不会调用广告服务、不会回复评论，也不会开发 Agent 7。
