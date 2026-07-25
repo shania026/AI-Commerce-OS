@@ -1,0 +1,1765 @@
+{
+  "name": "AI Health OS Video Generator V1.0",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "video-trigger",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1000,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Entry point for AI Health OS Video Generator V1.0. Receives the complete Final Report JSON from an external caller without modifying the stable Master Orchestrator."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Parse the complete AI Health OS Final Report into one canonical object.\n// Supports objects, one-item arrays, JSON strings, Markdown-fenced JSON, and common n8n wrappers.\nconst input = $input.first()?.json || {};\nfunction stripFence(value) {\n  if (typeof value !== 'string') return value;\n  return value.trim().replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```$/i, '').trim();\n}\nfunction parseMaybe(value) {\n  const clean = stripFence(value);\n  return typeof clean === 'string' ? JSON.parse(clean) : clean;\n}\nfunction unwrap(value) {\n  let current = value;\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  if (current && typeof current === 'object' && current.json && Object.keys(current).length <= 3) current = current.json;\n  if (current && typeof current === 'object' && current.final_report_json !== undefined) current = current.final_report_json;\n  else if (current && typeof current === 'object' && current.final_report !== undefined) current = current.final_report;\n  else if (current && typeof current === 'object' && current.data && !current.agent_results) current = current.data;\n  else if (current && typeof current === 'object' && current.output && !current.agent_results) current = current.output;\n  current = parseMaybe(current);\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  if (current && typeof current === 'object' && current.json && Object.keys(current).length <= 3) current = current.json;\n  return current;\n}\ntry {\n  const source = input.final_report_json ?? input.final_report ?? input.payload ?? input;\n  const finalReport = unwrap(parseMaybe(source));\n  if (!finalReport || typeof finalReport !== 'object' || Array.isArray(finalReport)) throw new Error('Final Report must resolve to a JSON object.');\n  return [{ json: { parse_success: true, parse_error: '', requested_model: String(input.video_model || input.model || finalReport.video_model || 'veo_3'), final_report: finalReport, raw_input: input } }];\n} catch (error) {\n  return [{ json: { parse_success: false, parse_error: `Final Report JSON parse failed: ${error.message}`, requested_model: String(input.video_model || input.model || 'veo_3'), final_report: {}, raw_input: input } }];\n}\n"
+      },
+      "id": "parse-final",
+      "name": "Parse Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -840,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Parses object, array, string, Markdown JSON, and common n8n wrapper inputs into one Final Report object."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Validate the Master Final Report before any production prompts are generated.\n// Validation is non-destructive and reports every missing requirement in one response.\nconst data = $input.first()?.json || {};\nconst report = data.final_report || {};\nconst results = report.agent_results || {};\nconst a3 = results.agent_3 || report.agent_3_output || {};\nconst a4 = results.agent_4 || report.agent_4_output || {};\nconst a5 = results.agent_5 || report.agent_5_output || {};\nconst a6 = results.agent_6 || report.agent_6_output || {};\nfunction arrayAt(obj, keys) { for (const key of keys) if (Array.isArray(obj?.[key])) return obj[key]; return []; }\nfunction text(value) { return String(value ?? '').trim(); }\nconst scripts = arrayAt(a3, ['scripts', 'script_results', 'results', 'records']);\nconst plans = arrayAt(a4, ['visual_plans', 'visual_projects', 'results', 'records']);\nconst voiceovers = arrayAt(a5, ['voiceover_packages', 'results', 'records']);\nconst publishing = Array.isArray(report.final_publishing_packages) ? report.final_publishing_packages : arrayAt(a6, ['publishing_packages', 'results', 'records']);\nconst script = scripts[0] || {};\nconst plan = plans[0] || {};\nconst voiceover = voiceovers[0] || {};\nconst scenes = arrayAt(plan, ['scenes', 'scene_plan', 'shot_list', 'shots']);\nconst errors = [];\nconst warnings = [];\nif (!data.parse_success) errors.push(data.parse_error || 'Final Report could not be parsed.');\nif (text(report.status).toLowerCase() !== 'success') errors.push('Final Report status must be success.');\nif (!report.agent_results && !report.agent_3_output) errors.push('Preserved Agent outputs are missing.');\nif (!text(report.topic || script.topic || script.source_title)) errors.push('Topic is missing.');\nif (!text(report.product_name) && !text(publishing[0]?.product_name)) warnings.push('Product Name is empty; production can continue without product placement.');\nif (!text(script.video_title || publishing[0]?.video_title)) errors.push('Video Title is missing.');\nif (!text(script.hook)) errors.push('Hook is missing from Agent 3 output.');\nif (!text(script.full_script || script.body)) errors.push('Full Script or script body is missing from Agent 3 output.');\nif (!plans.length) errors.push('Agent 4 visual_plans[] is empty.');\nif (!scenes.length) errors.push('Scene Plan / Shot List is empty.');\nif (!text(voiceover.full_voiceover_script || voiceover.voiceover_script || voiceover.voiceover)) errors.push('Voiceover is missing from Agent 5 output.');\nif (!text(voiceover.srt) && !arrayAt(voiceover, ['subtitle_segments', 'subtitles']).length) errors.push('Subtitles and SRT are missing from Agent 5 output.');\nif (!publishing.length) errors.push('Publishing Package is missing from Agent 6 output.');\nreturn [{ json: { ...data, validation_passed: errors.length === 0, validation_errors: errors, validation_warnings: warnings, source_counts: { scripts: scripts.length, visual_plans: plans.length, scenes: scenes.length, voiceover_packages: voiceovers.length, publishing_packages: publishing.length } } }];\n"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Validates successful Master status and required Agent 3–6 production fields before prompt generation."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "input-valid-condition",
+              "leftValue": "={{ $json.validation_passed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "input-valid",
+      "name": "Input Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -520,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE continues to production extraction. FALSE stops safely and returns a structured validation error."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Return a structured error when Final Report parsing or required-field validation fails.\n// No prompts or files are generated on this branch.\nconst data = $input.first()?.json || {};\nreturn [{ json: { workflow: 'AI Health OS Video Generator', version: '1.0', status: 'error', failed_step: data.parse_success ? 'Validate Input' : 'Parse Final Report', parse_error: data.parse_error || '', validation_errors: data.validation_errors || [], validation_warnings: data.validation_warnings || [], suggested_action: 'Provide the complete successful AI Health OS Final Report JSON with preserved Agent 3–6 outputs.', raw_input: data.raw_input || {} } }];\n"
+      },
+      "id": "input-error",
+      "name": "Build Validation Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -360,
+        500
+      ],
+      "notesInFlow": true,
+      "notes": "Builds a structured parse/validation error; no prompts or files are generated."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Extract production fields from preserved Agent 3–6 outputs into a stable internal contract.\n// Agent outputs and Agent 6 publishing content are copied, never rewritten.\nconst data = $input.first()?.json || {};\nconst report = data.final_report || {};\nconst results = report.agent_results || {};\nconst a3 = results.agent_3 || report.agent_3_output || {};\nconst a4 = results.agent_4 || report.agent_4_output || {};\nconst a5 = results.agent_5 || report.agent_5_output || {};\nconst a6 = results.agent_6 || report.agent_6_output || {};\nfunction arrayAt(obj, keys) { for (const key of keys) if (Array.isArray(obj?.[key])) return obj[key]; return []; }\nfunction text(value) { return String(value ?? '').trim(); }\nconst script = arrayAt(a3, ['scripts', 'script_results', 'results', 'records'])[0] || {};\nconst visualPlan = arrayAt(a4, ['visual_plans', 'visual_projects', 'results', 'records'])[0] || {};\nconst voiceoverPackage = arrayAt(a5, ['voiceover_packages', 'results', 'records'])[0] || {};\nconst publishingPackage = (Array.isArray(report.final_publishing_packages) ? report.final_publishing_packages : arrayAt(a6, ['publishing_packages', 'results', 'records']))[0] || {};\nconst hook = text(script.hook);\nconst body = text(script.body || script.full_script || script.script);\nconst cta = text(script.cta);\nconst fullScript = text(script.full_script || [hook, body, cta].filter(Boolean).join(' '));\nconst scenePlan = arrayAt(visualPlan, ['scenes', 'scene_plan', 'shot_list', 'shots']);\nreturn [{ json: { ...data, production_input: { source_workflow: text(report.workflow || 'AI Health OS Master Orchestrator'), source_master_run_id: text(report.master_run_id), topic: text(report.topic || script.topic || script.source_title), product_name: text(report.product_name || publishingPackage.product_name), target_platform: text(report.target_platform), target_audience: text(report.target_audience), language: text(report.language || 'en-US'), brand_tone: text(report.brand_tone), video_duration_seconds: Number(report.video_duration_seconds || voiceoverPackage.estimated_duration_seconds || 30), video_title: text(script.video_title || publishingPackage.video_title), hook, full_script: fullScript, scene_plan: scenePlan, visual_plan: visualPlan, visual_prompts: arrayAt(visualPlan, ['visual_prompts', 'image_prompts', 'video_prompts']), voiceover: text(voiceoverPackage.full_voiceover_script || voiceoverPackage.voiceover_script || voiceoverPackage.voiceover), voiceover_segments: arrayAt(voiceoverPackage, ['voiceover_segments', 'narration_segments']), subtitles: arrayAt(voiceoverPackage, ['subtitle_segments', 'subtitles']), subtitles_srt: text(voiceoverPackage.srt), publishing_package: publishingPackage } } }];\n"
+      },
+      "id": "extract-inputs",
+      "name": "Extract Production Inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -360,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Extracts topic, product, script, visuals, voiceover, subtitles, SRT, and publishing data without changing upstream content."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Build a completely model-independent Canonical Scene Specification.\n// No provider names, provider parameters, or provider-specific syntax are introduced here.\nconst data = $input.first()?.json || {};\nconst input = data.production_input || {};\nfunction text(value) { return String(value ?? '').trim(); }\nfunction number(value, fallback) { const n = Number(value); return Number.isFinite(n) && n >= 0 ? n : fallback; }\nfunction array(value) { return Array.isArray(value) ? value : []; }\nconst rawScenes = array(input.scene_plan);\nconst defaultDuration = rawScenes.length ? number(input.video_duration_seconds, 30) / rawScenes.length : number(input.video_duration_seconds, 30);\nconst scenes = rawScenes.map((scene, index) => {\n  const camera = scene.camera && typeof scene.camera === 'object' ? scene.camera : {};\n  const start = number(scene.start_time_seconds ?? scene.start_time ?? scene.start, index * defaultDuration);\n  const duration = number(scene.duration_seconds ?? scene.duration, defaultDuration);\n  const visualPrompt = text(scene.visual_prompt || scene.image_prompt || scene.video_prompt || scene.visual_description || scene.description);\n  return {\n    scene_id: text(scene.scene_id || scene.shot_id || `scene_${String(index + 1).padStart(3, '0')}`),\n    scene_number: index + 1,\n    start_time_seconds: start,\n    duration_seconds: duration,\n    narration: text(scene.narration || scene.voiceover || input.voiceover_segments[index]?.voiceover_text),\n    subtitle: text(scene.subtitle || scene.subtitle_text || input.subtitles[index]?.text || input.subtitles[index]?.subtitle_text),\n    visual_goal: text(scene.visual_goal || scene.section || scene.purpose),\n    subject: text(scene.subject || 'the approved wellness subject'),\n    action: text(scene.action || scene.visual_action),\n    environment: text(scene.environment || scene.setting || scene.location),\n    camera: {\n      shot_type: text(camera.shot_type || scene.shot_type), angle: text(camera.angle || scene.camera_angle),\n      movement: text(camera.movement || scene.camera_movement), lens: text(camera.lens || scene.lens)\n    },\n    lighting: text(scene.lighting), color_palette: text(scene.color_palette || scene.colors),\n    composition: text(scene.composition || 'vertical 9:16 composition'),\n    continuity_notes: text(scene.continuity_notes || scene.continuity),\n    on_screen_text: text(scene.on_screen_text || scene.screen_text),\n    requires_image_prompt: Boolean(scene.requires_image_prompt || scene.image_prompt || scene.reference_image_required),\n    source_visual_prompt: visualPrompt,\n    negative_constraints: array(scene.negative_constraints || scene.negative_prompt)\n  };\n});\nreturn [{ json: { ...data, canonical_scene_specification_version: '1.0', canonical_scenes: scenes } }];\n"
+      },
+      "id": "canonical-scenes",
+      "name": "Build Canonical Scene Specifications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Creates the model-independent Canonical Scene Specification consumed by every video model adapter."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Generate provider-neutral cinematic prompts from canonical scenes.\n// These prompts describe creative intent only; model adapters translate them into provider formats.\nconst data = $input.first()?.json || {};\nconst input = data.production_input || {};\nfunction text(value, fallback = '') { const v = String(value ?? '').trim(); return v || fallback; }\nconst scenes = (data.canonical_scenes || []).map((scene) => {\n  const camera = scene.camera || {};\n  const parts = [\n    `Scene ${scene.scene_number}, ${scene.duration_seconds} seconds, vertical 9:16 cinematic short-form video`,\n    `${text(scene.subject, 'Approved wellness subject')} ${text(scene.action, 'shown naturally')}`,\n    `environment: ${text(scene.environment, 'authentic calm wellness setting')}`,\n    `visual intent: ${text(scene.visual_goal || scene.source_visual_prompt, 'clear educational lifestyle storytelling')}`,\n    `camera: ${text(camera.shot_type, 'cinematic medium shot')}, ${text(camera.angle, 'natural eye-level angle')}, ${text(camera.movement, 'smooth controlled movement')}, ${text(camera.lens, 'natural cinematic depth of field')}`,\n    `lighting: ${text(scene.lighting, 'soft motivated natural light')}`,\n    `color palette: ${text(scene.color_palette, 'warm, calm, trustworthy natural tones')}`,\n    `composition: ${text(scene.composition, 'clean vertical composition with mobile-safe framing')}`,\n    `continuity: ${text(scene.continuity_notes, 'preserve subject, product, wardrobe, lighting, and spatial continuity')}`,\n    scene.on_screen_text ? `reserve clean space for later overlay text: ${scene.on_screen_text}; do not render letters in generated footage` : 'do not render text in generated footage',\n    'photorealistic details, believable motion, stable anatomy, coherent objects, polished commercial production quality',\n    'educational wellness context only; no medical outcomes, treatment imagery, logos, or watermark'\n  ];\n  const negative = ['medical procedure imagery', 'disease-treatment claims', 'guaranteed outcomes', 'warped anatomy', 'extra fingers', 'duplicate objects', 'flicker', 'unreadable text', 'logos', 'watermark', ...(scene.negative_constraints || [])];\n  return { ...scene, canonical_cinematic_prompt: parts.join('. ') + '.', canonical_negative_prompt: Array.from(new Set(negative.map(String))).join(', ') };\n});\nreturn [{ json: { ...data, canonical_scenes: scenes, canonical_prompt_count: scenes.length } }];\n"
+      },
+      "id": "cinematic-prompts",
+      "name": "Generate Canonical Cinematic Prompts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Creates one provider-neutral high-quality cinematic prompt per canonical scene."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Normalize the requested provider and expose one routing value for the Model Adapter Layer.\n// Upstream canonical scenes remain unchanged regardless of the selected provider.\nconst data = $input.first()?.json || {};\nconst raw = String(data.requested_model || 'veo_3').trim().toLowerCase().replace(/[\\s-]+/g, '_');\nconst aliases = { veo: 'veo_3', veo3: 'veo_3', google_veo_3: 'veo_3', runwayml: 'runway', runway_gen4: 'runway', kling_ai: 'kling', hailuo_ai: 'hailuo' };\nconst selected = aliases[raw] || raw;\nconst supported = ['veo_3', 'runway', 'kling', 'hailuo'];\nreturn [{ json: { ...data, selected_model: selected, adapter_supported: supported.includes(selected), available_adapters: supported } }];\n"
+      },
+      "id": "model-router",
+      "name": "Model Adapter Layer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Normalizes provider selection and routes canonical scenes to an isolated model-specific adapter."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-veo-condition",
+              "leftValue": "={{ $json.selected_model === \"veo_3\" }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-veo",
+      "name": "Use Veo 3 Adapter?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        280,
+        -300
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE selects Veo 3. FALSE checks the next installed model adapter."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Translate canonical scenes into Veo 3 prompt objects only.\n// This adapter may be replaced without changing parsing, canonical scenes, QA, or exports.\nconst data = $input.first()?.json || {};\nconst prompts = (data.canonical_scenes || []).map((s) => ({ provider: 'veo_3', scene_id: s.scene_id, prompt: `${s.canonical_cinematic_prompt} Include synchronized natural ambient audio appropriate to the scene; no generated dialogue unless narration is explicitly requested.`, duration_seconds: s.duration_seconds, aspect_ratio: '9:16', audio_guidance: 'Natural scene ambience; voiceover is added in post-production.', negative_prompt: s.canonical_negative_prompt, canonical_prompt: s.canonical_cinematic_prompt }));\nreturn [{ json: { ...data, model_adapter: 'veo_3', video_prompts: prompts } }];\n"
+      },
+      "id": "veo-adapter",
+      "name": "Veo 3 Adapter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        -300
+      ],
+      "notesInFlow": true,
+      "notes": "Translates canonical scenes into Veo 3 prompt format only; no upstream fields depend on Veo 3."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-runway-condition",
+              "leftValue": "={{ $json.selected_model === \"runway\" }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-runway",
+      "name": "Use Runway Adapter?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        280,
+        -100
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE selects Runway. FALSE checks the next installed model adapter."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Translate canonical scenes into Runway-oriented prompt objects only.\n// Canonical creative intent is preserved while provider controls stay isolated here.\nconst data = $input.first()?.json || {};\nconst prompts = (data.canonical_scenes || []).map((s) => ({ provider: 'runway', scene_id: s.scene_id, text_prompt: s.canonical_cinematic_prompt, duration_seconds: s.duration_seconds, ratio: '9:16', camera_control: s.camera?.movement || '', reference_mode: s.requires_image_prompt ? 'image_to_video' : 'text_to_video', negative_prompt: s.canonical_negative_prompt, canonical_prompt: s.canonical_cinematic_prompt }));\nreturn [{ json: { ...data, model_adapter: 'runway', video_prompts: prompts } }];\n"
+      },
+      "id": "runway-adapter",
+      "name": "Runway Adapter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        -100
+      ],
+      "notesInFlow": true,
+      "notes": "Translates canonical scenes into Runway prompt format only."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-kling-condition",
+              "leftValue": "={{ $json.selected_model === \"kling\" }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-kling",
+      "name": "Use Kling Adapter?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        280,
+        100
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE selects Kling. FALSE checks the next installed model adapter."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Translate canonical scenes into Kling-oriented prompt objects only.\n// No upstream extraction or canonical scene field depends on Kling.\nconst data = $input.first()?.json || {};\nconst prompts = (data.canonical_scenes || []).map((s) => ({ provider: 'kling', scene_id: s.scene_id, positive_prompt: s.canonical_cinematic_prompt, negative_prompt: s.canonical_negative_prompt, duration_seconds: s.duration_seconds, aspect_ratio: '9:16', motion_guidance: s.camera?.movement || 'smooth natural motion', creativity_mode: 'balanced', canonical_prompt: s.canonical_cinematic_prompt }));\nreturn [{ json: { ...data, model_adapter: 'kling', video_prompts: prompts } }];\n"
+      },
+      "id": "kling-adapter",
+      "name": "Kling Adapter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        100
+      ],
+      "notesInFlow": true,
+      "notes": "Translates canonical scenes into Kling prompt format only."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-hailuo-condition",
+              "leftValue": "={{ $json.selected_model === \"hailuo\" }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-hailuo",
+      "name": "Use Hailuo Adapter?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        280,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE selects Hailuo. FALSE returns an unsupported-adapter error."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Translate canonical scenes into Hailuo-oriented prompt objects only.\n// Provider-specific motion and framing instructions are confined to this adapter.\nconst data = $input.first()?.json || {};\nconst prompts = (data.canonical_scenes || []).map((s) => ({ provider: 'hailuo', scene_id: s.scene_id, prompt: s.canonical_cinematic_prompt, negative_prompt: s.canonical_negative_prompt, duration_seconds: s.duration_seconds, aspect_ratio: '9:16', motion: s.camera?.movement || 'stable cinematic movement', first_frame_reference_recommended: Boolean(s.requires_image_prompt), canonical_prompt: s.canonical_cinematic_prompt }));\nreturn [{ json: { ...data, model_adapter: 'hailuo', video_prompts: prompts } }];\n"
+      },
+      "id": "hailuo-adapter",
+      "name": "Hailuo Adapter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Translates canonical scenes into Hailuo prompt format only."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Fail safely when no installed Model Adapter matches the requested provider.\n// The response lists supported adapters and does not generate partial files.\nconst data = $input.first()?.json || {};\nreturn [{ json: { workflow: 'AI Health OS Video Generator', version: '1.0', status: 'error', failed_step: 'Model Adapter Layer', requested_model: data.selected_model || data.requested_model || '', available_adapters: data.available_adapters || ['veo_3', 'runway', 'kling', 'hailuo'], error_message: 'No installed Model Adapter matches the requested video model.', suggested_action: 'Choose a supported adapter or add a new isolated adapter node that consumes the Canonical Scene Specification.' } }];\n"
+      },
+      "id": "adapter-error",
+      "name": "Build Model Adapter Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        500
+      ],
+      "notesInFlow": true,
+      "notes": "Stops safely when the requested provider has no installed adapter and lists supported choices."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Build optional model-independent still-image/reference-frame prompts for each scene.\n// Image prompts remain separate from video-provider adapters and preserve scene alignment.\nconst data = $input.first()?.json || {};\nconst prompts = (data.canonical_scenes || []).map((s) => ({ scene_id: s.scene_id, required: Boolean(s.requires_image_prompt), purpose: s.requires_image_prompt ? 'reference_frame_or_image_to_video_input' : 'not_required', image_prompt: s.requires_image_prompt ? `${s.canonical_cinematic_prompt} Render a single decisive still frame with no motion blur and no text.` : '', negative_prompt: s.requires_image_prompt ? s.canonical_negative_prompt : '', aspect_ratio: '9:16', continuity_reference: s.continuity_notes || '' }));\nreturn [{ json: { ...data, image_prompts: prompts } }];\n"
+      },
+      "id": "image-adapter",
+      "name": "Generate Image Prompts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Builds optional model-independent reference-image prompts while preserving scene alignment."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Run production QA after the selected model adapter and image prompt stage.\n// QA blocks exports if scenes, prompts, voiceover, SRT, or publishing data are incomplete.\nconst data = $input.first()?.json || {};\nconst input = data.production_input || {};\nconst scenes = Array.isArray(data.canonical_scenes) ? data.canonical_scenes : [];\nconst videoPrompts = Array.isArray(data.video_prompts) ? data.video_prompts : [];\nconst imagePrompts = Array.isArray(data.image_prompts) ? data.image_prompts : [];\nconst issues = [];\nconst warnings = [...(data.validation_warnings || [])];\nif (!scenes.length) issues.push('No canonical scenes were generated.');\nif (videoPrompts.length !== scenes.length) issues.push('Every canonical scene must have exactly one model-adapted video prompt.');\nif (imagePrompts.length !== scenes.length) issues.push('Image prompt alignment does not match canonical scenes.');\nif (new Set(scenes.map((s) => s.scene_id)).size !== scenes.length) issues.push('Canonical scene IDs must be unique.');\nif (videoPrompts.some((p) => !String(p.prompt || p.text_prompt || p.positive_prompt || '').trim())) issues.push('One or more model prompts are empty.');\nif (!String(input.voiceover || '').trim()) issues.push('Voiceover is empty.');\nif (!String(input.subtitles_srt || '').includes('-->')) issues.push('SRT is missing or has no timestamp arrow.');\nif (!input.publishing_package || !Object.keys(input.publishing_package).length) issues.push('Publishing package is empty.');\nconst qaScore = Math.max(0, 100 - issues.length * 20 - warnings.length * 2);\nreturn [{ json: { ...data, production_qa: { passed: issues.length === 0, score: qaScore, issues, warnings }, qa_passed: issues.length === 0 } }];\n"
+      },
+      "id": "production-qa",
+      "name": "Production Package QA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Checks scene coverage, adapter output, voiceover, SRT, publishing data, and file readiness."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "qa-passed-condition",
+              "leftValue": "={{ $json.qa_passed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "qa-passed",
+      "name": "Production QA Passed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE builds exports. FALSE returns a structured production QA error."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Return a structured production QA failure without exporting misleading artifacts.\n// Partial canonical data is retained only for diagnosis.\nconst data = $input.first()?.json || {};\nreturn [{ json: { workflow: 'AI Health OS Video Generator', version: '1.0', status: 'error', failed_step: 'Production Package QA', model_adapter: data.model_adapter || data.selected_model || '', qa: data.production_qa || {}, error_message: 'Production package did not pass QA.', suggested_action: 'Review QA issues and the source Agent 3–6 outputs, then rerun with the complete Final Report.', partial_scene_count: (data.canonical_scenes || []).length } }];\n"
+      },
+      "id": "production-error",
+      "name": "Build Production Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Returns QA issues and diagnostic counts without generating files."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Assemble the complete production package after QA passes.\n// Agent 6 publishing content is preserved exactly and no external generation service is called.\nconst data = $input.first()?.json || {};\nconst input = data.production_input || {};\nconst generatedAt = new Date().toISOString();\nconst packageData = { workflow: 'AI Health OS Video Generator', version: '1.0', status: 'success', source_workflow: input.source_workflow, source_master_run_id: input.source_master_run_id, model_adapter: data.model_adapter, topic: input.topic, product_name: input.product_name, video_title: input.video_title, hook: input.hook, full_script: input.full_script, canonical_scene_specification_version: data.canonical_scene_specification_version, scenes: data.canonical_scenes || [], video_prompts: data.video_prompts || [], image_prompts: data.image_prompts || [], voiceover: input.voiceover, voiceover_segments: input.voiceover_segments || [], subtitles: input.subtitles || [], subtitles_srt: input.subtitles_srt, publishing_package: input.publishing_package, ...(data.model_adapter === 'runway' ? { generated_video_results: Array.isArray(data.generated_video_results) ? data.generated_video_results : [], runway_execution: data.runway_execution || null } : {}), qa: data.production_qa, generated_at: generatedAt, ready_for_manual_generation: true, disclaimer: 'This workflow prepares prompts and production files only. It does not generate media, call external model APIs, upload content, or publish automatically. Human review is required.' };\nreturn [{ json: { ...data, production_package: packageData } }];\n"
+      },
+      "id": "build-package",
+      "name": "Build Complete Production Package",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Assembles canonical scenes, selected adapter prompts, image prompts, voiceover, subtitles, publishing package, and QA."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Export the approved package as five named downloadable n8n binary artifacts.\n// Files are created in memory; this node does not write to the host filesystem or call external APIs.\nconst data = $input.first()?.json || {};\nconst p = data.production_package || {};\nfunction pretty(value) { return JSON.stringify(value, null, 2); }\nfunction binaryFile(content, fileName, mimeType) { return { data: Buffer.from(String(content ?? ''), 'utf8').toString('base64'), mimeType, fileName, fileExtension: fileName.split('.').pop() }; }\nconst videoJson = pretty({ workflow: p.workflow, version: p.version, model_adapter: p.model_adapter, source_master_run_id: p.source_master_run_id, video_title: p.video_title, canonical_scene_specification_version: p.canonical_scene_specification_version, video_prompts: p.video_prompts, ...(p.model_adapter === 'runway' ? { generated_video_results: p.generated_video_results || [], runway_execution: p.runway_execution || null } : {}) });\nconst imageJson = pretty({ workflow: p.workflow, version: p.version, source_master_run_id: p.source_master_run_id, video_title: p.video_title, image_prompts: p.image_prompts });\nconst voiceoverText = [`Title: ${p.video_title || ''}`, '', p.voiceover || '', '', 'Voiceover Segments', ...(p.voiceover_segments || []).map((s) => `${s.segment_number || ''} [${s.start_time_seconds ?? ''}-${s.end_time_seconds ?? ''}s] ${s.voiceover_text || s.text || ''}`)].join('\\n');\nconst md = ['# AI Health OS Video Production Package', '', `- Status: ${p.status}`, `- Model Adapter: ${p.model_adapter}`, `- Source Master Run ID: ${p.source_master_run_id || ''}`, `- Topic: ${p.topic || ''}`, `- Product: ${p.product_name || ''}`, `- Video Title: ${p.video_title || ''}`, `- QA Score: ${p.qa?.score ?? ''}`, '', '## Hook', '', p.hook || '', '', '## Full Script', '', p.full_script || '', '', '## Scene Production Plan', '', ...(p.scenes || []).flatMap((s) => [`### Scene ${s.scene_number}: ${s.scene_id}`, '', `- Duration: ${s.duration_seconds}s`, `- Subject: ${s.subject}`, `- Action: ${s.action}`, `- Environment: ${s.environment}`, `- Camera: ${s.camera?.shot_type || ''}; ${s.camera?.angle || ''}; ${s.camera?.movement || ''}`, `- Canonical Prompt: ${s.canonical_cinematic_prompt}`, `- Negative Prompt: ${s.canonical_negative_prompt}`, '']), '## Model-Adapted Video Prompts', '', '```json', pretty(p.video_prompts || []), '```', '', '## Image Prompts', '', '```json', pretty(p.image_prompts || []), '```', '', ...(p.model_adapter === 'runway' ? ['## Generated Runway Scene Videos', '', '```json', pretty(p.generated_video_results || []), '```', ''] : []), '## Publishing Package', '', '```json', pretty(p.publishing_package || {}), '```', '', '## QA', '', '```json', pretty(p.qa || {}), '```', '', '## Safety Boundary', '', p.disclaimer || ''].join('\\n');\nconst binary = { video_prompts: binaryFile(videoJson, 'video_prompts.json', 'application/json'), image_prompts: binaryFile(imageJson, 'image_prompts.json', 'application/json'), voiceover: binaryFile(voiceoverText, 'voiceover.txt', 'text/plain'), subtitles: binaryFile(p.subtitles_srt || '', 'subtitles.srt', 'application/x-subrip'), production_package: binaryFile(md, 'production_package.md', 'text/markdown') };\nreturn [{ json: { ...p, files: ['video_prompts.json', 'image_prompts.json', 'voiceover.txt', 'subtitles.srt', 'production_package.md'], file_count: 5 }, binary }];\n"
+      },
+      "id": "export-files",
+      "name": "Export Production Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Creates video_prompts.json, image_prompts.json, voiceover.txt, subtitles.srt, and production_package.md in memory."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Return the final production package summary and all five binary files to the caller.\n// The successful result is ready for human-reviewed generation, not automatic media production.\nconst item = $input.first() || { json: {}, binary: {} };\nconst data = item.json || {};\nreturn [{ json: { ...data, total_scenes: (data.scenes || []).length, video_prompt_count: (data.video_prompts || []).length, image_prompt_count: (data.image_prompts || []).filter((p) => p.required).length, qa_passed: Boolean(data.qa?.passed), ready_for_manual_generation: Boolean(data.ready_for_manual_generation), ...(data.model_adapter === 'runway' ? { generated_video_results: Array.isArray(data.generated_video_results) ? data.generated_video_results : [] } : {}), files: data.files || [] }, binary: item.binary || {} }];\n"
+      },
+      "id": "success-output",
+      "name": "AI Health OS Video Generator Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Returns the successful package summary and all five downloadable binary artifacts to the caller."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Return one consistent error contract for validation, adapter, and production QA failures.\n// Error output never claims generation readiness and contains no generated files.\nconst data = $input.first()?.json || {};\nreturn [{ json: { ...data, status: 'error', ready_for_manual_generation: false, files: [] } }];\n"
+      },
+      "id": "error-output",
+      "name": "AI Health OS Video Generator Error Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        500
+      ],
+      "notesInFlow": true,
+      "notes": "Provides one consistent terminal error response for every failure path."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Expand Runway-adapted prompts into one API submission item per canonical scene.\n// Security: RUNWAY_API_KEY is read only by HTTP Request header expressions and is never added to item JSON.\n// TODO(RUNWAY-DOCS): Verify API version, endpoint, model, ratio, duration values, and request field names against current official Runway documentation after deployment.\nconst data = $input.first()?.json || {};\nconst supplied = data.raw_input?.runway_config || data.final_report?.runway_config || {};\nfunction num(value, fallback, min, max) { const n = Number(value); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback; }\nconst config = {\n  base_url: String(supplied.base_url || 'https://api.dev.runwayml.com').replace(/\\/$/, ''),\n  api_version: String(supplied.api_version || '2024-11-06'),\n  generation_endpoint: String(supplied.generation_endpoint || '/v1/text_to_video'),\n  task_endpoint: String(supplied.task_endpoint || '/v1/tasks'),\n  model: String(supplied.model || 'gen4.5'),\n  duration_seconds: num(supplied.duration_seconds, 5, 1, 10),\n  aspect_ratio: String(supplied.aspect_ratio || '720:1280'),\n  poll_interval_seconds: num(supplied.poll_interval_seconds, 10, 1, 300),\n  max_poll_count: Math.floor(num(supplied.max_poll_count, 60, 1, 360)),\n  request_timeout_ms: Math.floor(num(supplied.request_timeout_ms, 120000, 5000, 600000)),\n  max_submit_retries: Math.floor(num(supplied.max_submit_retries, 3, 0, 10)),\n  max_total_wait_seconds: num(supplied.max_total_wait_seconds, 900, 10, 7200)\n};\nconst prompts = Array.isArray(data.video_prompts) ? data.video_prompts : [];\nreturn prompts.map((prompt, index) => ({ json: {\n  root_data: data,\n  scene_id: String(prompt.scene_id || `scene_${String(index + 1).padStart(3, '0')}`),\n  scene_index: index,\n  runway_config: config,\n  poll_count: 0,\n  submit_retry_count: 0,\n  polling_started_at: new Date().toISOString(),\n  request_body: {\n    model: config.model,\n    promptText: String(prompt.text_prompt || prompt.prompt || prompt.positive_prompt || prompt.canonical_prompt || ''),\n    ratio: config.aspect_ratio,\n    duration: config.duration_seconds\n  }\n}, pairedItem: { item: 0 } }));\n"
+      },
+      "id": "runway-prepare-request",
+      "name": "Prepare Runway API Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        620,
+        -720
+      ],
+      "notesInFlow": true,
+      "notes": "Creates one sanitized Runway text-to-video request per scene. Requires the n8n environment variable RUNWAY_API_KEY. TODO: verify endpoint, API version, model, ratio, duration, and field names against current Runway docs."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.runway_config.base_url + $json.runway_config.generation_endpoint }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.RUNWAY_API_KEY }}"
+            },
+            {
+              "name": "X-Runway-Version",
+              "value": "={{ $json.runway_config.api_version }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": "={{ $json.runway_config.request_timeout_ms }}",
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.request_body) }}"
+      },
+      "id": "runway-submit-job",
+      "name": "Submit Runway Generation Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        -720
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "notesInFlow": true,
+      "notes": "Submits one Runway generation task per scene using Authorization: Bearer {{$env.RUNWAY_API_KEY}}. Built-in retries cover transient network/rate-limit failures. TODO: verify POST endpoint and headers against current Runway docs."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Capture the Runway task ID while restoring scene_id and polling configuration after HTTP submission.\n// TODO(RUNWAY-DOCS): Verify the task identifier and error body fields against the deployed Runway API version.\nconst response = $input.first()?.json || {};\nconst request = typeof $ === 'function' ? ($('Prepare Runway Submission Attempt').item?.json || {}) : (response.__request_context || {});\nconst body = response.body && typeof response.body === 'object' ? response.body : response;\nconst statusCode = Number(response.statusCode || response.status || (body.id ? 200 : 0));\nconst jobId = String(body.id || body.taskId || body.task_id || '').trim();\nconst retryAfter = Number(response.headers?.['retry-after'] || response.headers?.['Retry-After'] || 0);\nconst accepted = statusCode >= 200 && statusCode < 300 && Boolean(jobId);\nconst retryable = statusCode === 429 || statusCode >= 500 || statusCode === 0;\nreturn [{ json: { ...request, submit_status_code: statusCode, job_id: jobId, submission_accepted: accepted, submission_retryable: retryable, retry_after_seconds: retryAfter, sanitized_submit_response: { status_code: statusCode, id: jobId, error: accepted ? '' : String(body.error || body.message || `Runway submission returned HTTP ${statusCode || 'unknown'}`) } } }];\n"
+      },
+      "id": "runway-capture-job",
+      "name": "Capture Runway Job ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        -720
+      ],
+      "notesInFlow": true,
+      "notes": "Captures the returned Runway task ID and restores scene_id without exposing authorization data. TODO: verify response ID and error fields."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "runway-submission-accepted-condition",
+              "leftValue": "={{ $json.submission_accepted }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "runway-submission-accepted",
+      "name": "Runway Submission Accepted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        -720
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE begins bounded polling. FALSE records a sanitized scene-level submission failure."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Convert a rejected or malformed Runway submission into a scene-level structured result.\n// Secrets and request headers are intentionally excluded.\nconst data = $input.first()?.json || {};\nreturn [{ json: { root_data: data.root_data || {}, runway_scene_result: { scene_id: data.scene_id || '', scene_index: data.scene_index, status: 'failed', stage: 'submit', job_id: data.job_id || '', status_code: data.submit_status_code || 0, error_code: data.submit_status_code === 429 ? 'rate_limited' : 'submission_failed', error_message: data.sanitized_submit_response?.error || 'Runway submission failed.', poll_count: 0, video_url: '', metadata: {} } } }];\n"
+      },
+      "id": "runway-submit-failure",
+      "name": "Build Runway Submission Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        -520
+      ],
+      "notesInFlow": true,
+      "notes": "Builds a structured submission failure for this scene, including rate-limit status but excluding credentials."
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": "={{ $json.runway_config.poll_interval_seconds }}",
+        "unit": "seconds"
+      },
+      "id": "runway-wait",
+      "name": "Wait for Runway Job",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        -820
+      ],
+      "notesInFlow": true,
+      "notes": "Waits for the configurable poll_interval_seconds before checking task status. This node does not perform busy waiting."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Prepare a sanitized task-status request while retaining scene and bounded-polling state.\n// TODO(RUNWAY-DOCS): Verify the /v1/tasks/{id} task-status endpoint after deployment.\nconst data = $input.first()?.json || {};\nreturn [{ json: { ...data, status_request_url: `${data.runway_config.base_url}${data.runway_config.task_endpoint}/${encodeURIComponent(data.job_id)}` } }];\n"
+      },
+      "id": "runway-prepare-status",
+      "name": "Prepare Runway Status Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        -820
+      ],
+      "notesInFlow": true,
+      "notes": "Builds the task-status URL from the preserved job ID. TODO: verify the task endpoint against current Runway docs."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.status_request_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.RUNWAY_API_KEY }}"
+            },
+            {
+              "name": "X-Runway-Version",
+              "value": "={{ $json.runway_config.api_version }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": "={{ $json.runway_config.request_timeout_ms }}",
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "runway-check-status",
+      "name": "Check Runway Job Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1700,
+        -820
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput",
+      "notesInFlow": true,
+      "notes": "Checks one Runway task using RUNWAY_API_KEY. Includes retries, request timeout, full response status, and safe continuation for structured errors. TODO: verify GET endpoint and headers."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Normalize Runway task states and outputs into provider-independent polling fields.\n// TODO(RUNWAY-DOCS): Verify status values and output/video URL fields against the deployed Runway API version.\nconst response = $input.first()?.json || {};\nconst state = typeof $ === 'function' ? ($('Prepare Runway Status Request').item?.json || {}) : (response.__request_context || {});\nconst body = response.body && typeof response.body === 'object' ? response.body : response;\nconst statusCode = Number(response.statusCode || response.httpStatus || 200);\nconst rawStatus = String(body.status || body.state || '').trim().toUpperCase();\nconst completedStates = ['SUCCEEDED', 'SUCCESS', 'COMPLETED'];\nconst failedStates = ['FAILED', 'CANCELLED', 'CANCELED', 'ERROR'];\nconst processingStates = ['PENDING', 'THROTTLED', 'RUNNING', 'PROCESSING', 'QUEUED', 'IN_PROGRESS'];\nconst output = Array.isArray(body.output) ? body.output : (Array.isArray(body.outputs) ? body.outputs : []);\nconst videoUrl = String(output[0] || body.videoUrl || body.video_url || body.url || '').trim();\nconst rateLimited = statusCode === 429;\nconst apiError = statusCode >= 400 && !rateLimited;\nreturn [{ json: { ...state, check_status_code: statusCode, runway_raw_status: rawStatus || (rateLimited ? 'THROTTLED' : 'UNKNOWN'), runway_completed: completedStates.includes(rawStatus) && Boolean(videoUrl), runway_failed: failedStates.includes(rawStatus) || apiError, runway_processing: processingStates.includes(rawStatus) || rateLimited, generated_video_url: videoUrl, retry_after_seconds: Number(response.headers?.['retry-after'] || response.headers?.['Retry-After'] || state.retry_after_seconds || 0), sanitized_status_response: { status_code: statusCode, status: rawStatus, output_count: output.length, error: String(body.failure || body.error || body.message || '') }, task_metadata: { created_at: body.createdAt || body.created_at || '', updated_at: body.updatedAt || body.updated_at || '', progress: body.progress ?? null } } }];\n"
+      },
+      "id": "runway-normalize-status",
+      "name": "Normalize Runway Job Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1880,
+        -820
+      ],
+      "notesInFlow": true,
+      "notes": "Normalizes processing, success, failure, rate-limit, output URL, and metadata fields. TODO: verify task status values and output URL schema."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "runway-completed-condition",
+              "leftValue": "={{ $json.runway_completed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "runway-completed",
+      "name": "Runway Job Completed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2060,
+        -820
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE collects the generated URL. FALSE checks terminal failure and then bounded polling limits."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Preserve scene_id and collect the completed Runway video URL and safe task metadata.\n// No video is downloaded, uploaded, or published.\nconst data = $input.first()?.json || {};\nreturn [{ json: { root_data: data.root_data || {}, runway_scene_result: { scene_id: data.scene_id, scene_index: data.scene_index, status: 'completed', stage: 'complete', job_id: data.job_id, status_code: data.check_status_code, poll_count: data.poll_count || 0, video_url: data.generated_video_url, metadata: { provider: 'runway', model: data.runway_config?.model || '', aspect_ratio: data.runway_config?.aspect_ratio || '', duration_seconds: data.runway_config?.duration_seconds || 0, api_status: data.runway_raw_status, ...data.task_metadata } } } }];\n"
+      },
+      "id": "runway-collect-video",
+      "name": "Collect Runway Video URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        -980
+      ],
+      "notesInFlow": true,
+      "notes": "Collects the generated video URL with scene_id, job ID, model, ratio, duration, polling count, and safe task metadata."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "runway-failed-condition",
+              "leftValue": "={{ $json.runway_failed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "runway-failed",
+      "name": "Runway Job Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        -720
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE records a terminal API/task failure. FALSE increments the bounded polling counter."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Convert a terminal Runway task/API failure into a scene-level structured result.\n// API secrets, authorization headers, and full request bodies are never included.\nconst data = $input.first()?.json || {};\nreturn [{ json: { root_data: data.root_data || {}, runway_scene_result: { scene_id: data.scene_id || '', scene_index: data.scene_index, status: 'failed', stage: 'poll', job_id: data.job_id || '', status_code: data.check_status_code || 0, error_code: data.check_status_code === 429 ? 'rate_limited' : 'generation_failed', error_message: data.sanitized_status_response?.error || `Runway task ended with status ${data.runway_raw_status || 'unknown'}.`, poll_count: data.poll_count || 0, video_url: '', metadata: { api_status: data.runway_raw_status || '' } } } }];\n"
+      },
+      "id": "runway-api-failure",
+      "name": "Build Runway API Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        -520
+      ],
+      "notesInFlow": true,
+      "notes": "Builds a sanitized scene-level task failure and retains the job ID for investigation."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Increment bounded polling state and calculate timeout without changing scene identity.\n// Infinite polling is prevented by both max_poll_count and max_total_wait_seconds.\nconst data = $input.first()?.json || {};\nconst pollCount = Number(data.poll_count || 0) + 1;\nconst started = Date.parse(data.polling_started_at || new Date().toISOString());\nconst elapsedSeconds = Math.max(0, (Date.now() - started) / 1000);\nconst timedOut = pollCount >= Number(data.runway_config?.max_poll_count || 60) || elapsedSeconds >= Number(data.runway_config?.max_total_wait_seconds || 900);\nreturn [{ json: { ...data, poll_count: pollCount, elapsed_polling_seconds: elapsedSeconds, runway_timed_out: timedOut } }];\n"
+      },
+      "id": "runway-increment-poll",
+      "name": "Increment Runway Poll Count",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        -720
+      ],
+      "notesInFlow": true,
+      "notes": "Increments poll_count and calculates elapsed time to prevent infinite polling."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "runway-poll-limit-condition",
+              "leftValue": "={{ $json.runway_timed_out }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "runway-poll-limit",
+      "name": "Runway Poll Limit Reached?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        -720
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE returns a timeout result. FALSE loops back to Wait for Runway Job."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Return a deterministic scene-level timeout after configured polling limits are reached.\n// The task ID is retained for manual investigation or recovery.\nconst data = $input.first()?.json || {};\nreturn [{ json: { root_data: data.root_data || {}, runway_scene_result: { scene_id: data.scene_id || '', scene_index: data.scene_index, status: 'timeout', stage: 'poll', job_id: data.job_id || '', status_code: data.check_status_code || 0, error_code: 'poll_timeout', error_message: `Runway task exceeded ${data.poll_count || 0} polls or ${Math.round(data.elapsed_polling_seconds || 0)} seconds.`, poll_count: data.poll_count || 0, video_url: '', metadata: { last_api_status: data.runway_raw_status || '' } } } }];\n"
+      },
+      "id": "runway-timeout",
+      "name": "Build Runway Timeout",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2780,
+        -520
+      ],
+      "notesInFlow": true,
+      "notes": "Builds a deterministic timeout result when max_poll_count or max_total_wait_seconds is reached."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Assemble all completed, failed, and timed-out Runway scene results in canonical scene order.\n// The production package proceeds only when every scene has a generated video URL.\nconst items = $input.all();\nconst payloads = items.map((item) => item.json || {});\nconst root = payloads.find((p) => p.root_data)?.root_data || {};\nconst results = payloads.map((p) => p.runway_scene_result).filter(Boolean).sort((a, b) => Number(a.scene_index || 0) - Number(b.scene_index || 0));\nconst expected = Array.isArray(root.video_prompts) ? root.video_prompts.length : results.length;\nconst completed = results.filter((r) => r.status === 'completed' && r.video_url);\nconst failed = results.filter((r) => r.status !== 'completed' || !r.video_url);\nreturn [{ json: { ...root, runway_execution: { attempted: true, provider: 'runway', expected_scene_count: expected, completed_scene_count: completed.length, failed_scene_count: failed.length, success: expected > 0 && completed.length === expected && failed.length === 0, results }, generated_video_results: completed } }];\n"
+      },
+      "id": "runway-assemble-results",
+      "name": "Assemble Runway Scene Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2960,
+        -720
+      ],
+      "notesInFlow": true,
+      "notes": "Assembles every scene outcome in canonical order and succeeds only when all expected Runway jobs return video URLs."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "runway-execution-success-condition",
+              "leftValue": "={{ $json.runway_execution.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "runway-execution-success",
+      "name": "Runway Execution Successful?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3140,
+        -720
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE rejoins the existing production path. FALSE routes to the existing unified error output through a structured Runway error."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Build one structured Runway execution error after all scene outcomes are assembled.\n// Sanitized scene errors are returned without secrets, request headers, or API keys.\nconst data = $input.first()?.json || {};\nconst execution = data.runway_execution || {};\nreturn [{ json: { workflow: 'AI Health OS Video Generator', version: '1.0', status: 'error', failed_step: 'Runway API Execution', model_adapter: 'runway', error_message: `${execution.failed_scene_count || 0} Runway scene job(s) failed or timed out.`, runway_execution: execution, generated_video_results: data.generated_video_results || [], suggested_action: 'Verify RUNWAY_API_KEY, Runway account credits, API configuration TODOs, task IDs, rate limits, and failed scene messages. No videos were uploaded or published.', ready_for_manual_generation: false, files: [] } }];\n"
+      },
+      "id": "runway-execution-error",
+      "name": "Build Runway Execution Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3320,
+        -520
+      ],
+      "notesInFlow": true,
+      "notes": "Returns sanitized job metadata and scene failures without exposing RUNWAY_API_KEY or automatically publishing content."
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "runway-scene-loop",
+      "name": "Loop Over Runway Scenes",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        760,
+        -720
+      ],
+      "notesInFlow": true,
+      "notes": "Processes exactly one canonical scene at a time and emits all terminal scene results together after the loop, enabling deterministic final assembly."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Preserve the latest scene and retry state immediately before each submission attempt.\n// This node never adds or exposes RUNWAY_API_KEY.\nconst data = $input.first()?.json || {};\nreturn [{ json: data }];\n"
+      },
+      "id": "runway-prepare-attempt",
+      "name": "Prepare Runway Submission Attempt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        -720
+      ],
+      "notesInFlow": true,
+      "notes": "Preserves scene_id and submit retry counters before the HTTP node so response normalization can restore the correct attempt state."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "runway-submit-retryable-condition",
+              "leftValue": "={{ $json.submission_retryable }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "runway-submit-retryable",
+      "name": "Runway Submission Retryable?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        -620
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE retries HTTP 429, 5xx, or transport failures within the configured limit. FALSE records a terminal submission failure."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Increment the bounded Runway submission retry counter.\n// Retries are capped by runway_config.max_submit_retries to prevent infinite resubmission.\nconst data = $input.first()?.json || {};\nconst count = Number(data.submit_retry_count || 0) + 1;\nreturn [{ json: { ...data, submit_retry_count: count, submission_retry_exhausted: count > Number(data.runway_config?.max_submit_retries ?? 3) } }];\n"
+      },
+      "id": "runway-increment-submit",
+      "name": "Increment Runway Submit Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        -620
+      ],
+      "notesInFlow": true,
+      "notes": "Increments the configurable submission retry counter without changing scene_id or request content."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "runway-submit-exhausted-condition",
+              "leftValue": "={{ $json.submission_retry_exhausted }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "runway-submit-exhausted",
+      "name": "Runway Submit Retries Exhausted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        -620
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE records a terminal failure. FALSE waits using Retry-After or the configured polling interval before resubmission."
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": "={{ $json.retry_after_seconds || $json.runway_config.poll_interval_seconds }}",
+        "unit": "seconds"
+      },
+      "id": "runway-submit-wait",
+      "name": "Wait Before Runway Resubmit",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1880,
+        -620
+      ],
+      "notesInFlow": true,
+      "notes": "Honors a sanitized Retry-After value when available, otherwise uses poll_interval_seconds before a bounded resubmission attempt."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Final Report": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Input Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input Valid?": {
+      "main": [
+        [
+          {
+            "node": "Extract Production Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Validation Error": {
+      "main": [
+        [
+          {
+            "node": "AI Health OS Video Generator Error Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Production Inputs": {
+      "main": [
+        [
+          {
+            "node": "Build Canonical Scene Specifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Canonical Scene Specifications": {
+      "main": [
+        [
+          {
+            "node": "Generate Canonical Cinematic Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Canonical Cinematic Prompts": {
+      "main": [
+        [
+          {
+            "node": "Model Adapter Layer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Model Adapter Layer": {
+      "main": [
+        [
+          {
+            "node": "Use Veo 3 Adapter?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Veo 3 Adapter?": {
+      "main": [
+        [
+          {
+            "node": "Veo 3 Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use Runway Adapter?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Runway Adapter?": {
+      "main": [
+        [
+          {
+            "node": "Runway Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use Kling Adapter?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Kling Adapter?": {
+      "main": [
+        [
+          {
+            "node": "Kling Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use Hailuo Adapter?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Hailuo Adapter?": {
+      "main": [
+        [
+          {
+            "node": "Hailuo Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Model Adapter Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Veo 3 Adapter": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runway Adapter": {
+      "main": [
+        [
+          {
+            "node": "Prepare Runway API Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kling Adapter": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hailuo Adapter": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Model Adapter Error": {
+      "main": [
+        [
+          {
+            "node": "AI Health OS Video Generator Error Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image Prompts": {
+      "main": [
+        [
+          {
+            "node": "Production Package QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Production Package QA": {
+      "main": [
+        [
+          {
+            "node": "Production QA Passed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Production QA Passed?": {
+      "main": [
+        [
+          {
+            "node": "Build Complete Production Package",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Production Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Production Error": {
+      "main": [
+        [
+          {
+            "node": "AI Health OS Video Generator Error Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Complete Production Package": {
+      "main": [
+        [
+          {
+            "node": "Export Production Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Production Files": {
+      "main": [
+        [
+          {
+            "node": "AI Health OS Video Generator Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Runway API Request": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Runway Scenes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit Runway Generation Job": {
+      "main": [
+        [
+          {
+            "node": "Capture Runway Job ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture Runway Job ID": {
+      "main": [
+        [
+          {
+            "node": "Runway Submission Accepted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runway Submission Accepted?": {
+      "main": [
+        [
+          {
+            "node": "Wait for Runway Job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runway Submission Retryable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Runway Job": {
+      "main": [
+        [
+          {
+            "node": "Prepare Runway Status Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Runway Status Request": {
+      "main": [
+        [
+          {
+            "node": "Check Runway Job Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Runway Job Status": {
+      "main": [
+        [
+          {
+            "node": "Normalize Runway Job Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Runway Job Status": {
+      "main": [
+        [
+          {
+            "node": "Runway Job Completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runway Job Completed?": {
+      "main": [
+        [
+          {
+            "node": "Collect Runway Video URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runway Job Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runway Job Failed?": {
+      "main": [
+        [
+          {
+            "node": "Build Runway API Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Increment Runway Poll Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment Runway Poll Count": {
+      "main": [
+        [
+          {
+            "node": "Runway Poll Limit Reached?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runway Poll Limit Reached?": {
+      "main": [
+        [
+          {
+            "node": "Build Runway Timeout",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait for Runway Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Runway Submission Failure": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Runway Scenes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Runway Video URL": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Runway Scenes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Runway API Failure": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Runway Scenes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Runway Timeout": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Runway Scenes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Runway Scene Results": {
+      "main": [
+        [
+          {
+            "node": "Runway Execution Successful?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runway Execution Successful?": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Runway Execution Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Runway Execution Error": {
+      "main": [
+        [
+          {
+            "node": "AI Health OS Video Generator Error Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Runway Scenes": {
+      "main": [
+        [
+          {
+            "node": "Assemble Runway Scene Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Runway Submission Attempt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Runway Submission Attempt": {
+      "main": [
+        [
+          {
+            "node": "Submit Runway Generation Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runway Submission Retryable?": {
+      "main": [
+        [
+          {
+            "node": "Increment Runway Submit Retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Runway Submission Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment Runway Submit Retry": {
+      "main": [
+        [
+          {
+            "node": "Runway Submit Retries Exhausted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runway Submit Retries Exhausted?": {
+      "main": [
+        [
+          {
+            "node": "Build Runway Submission Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Before Runway Resubmit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Runway Resubmit": {
+      "main": [
+        [
+          {
+            "node": "Prepare Runway Submission Attempt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ai-health-os-video-generator-v1-0",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "ai-health-os-video-generator-v1-0",
+  "tags": [
+    {
+      "name": "AI Health OS"
+    },
+    {
+      "name": "Video Generator"
+    },
+    {
+      "name": "V1.0"
+    },
+    {
+      "name": "Runway API Execution"
+    }
+  ]
+}
