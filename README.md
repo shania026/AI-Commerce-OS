@@ -55,3 +55,19 @@ See:
 - `docs/AGENT_MANUAL.md`
 - `docs/OPERATIONS_RUNBOOK.md`
 - `releases/v1.0/MANIFEST.md`
+
+## Post-V1.0 archive
+
+After the AI Health OS V1.0 release, legacy AI Commerce OS planning modules and the pre-V1 example project were moved into `Archive/`. Nothing was deleted or renamed; the original folder names and contents are preserved under the archive for historical reference.
+
+Archived folders:
+
+- `Archive/02-Trend-Analyzer/`
+- `Archive/05-Image-Prompt-Generator/`
+- `Archive/06-Runway-Video-Producer/`
+- `Archive/07-Voice-Over/`
+- `Archive/08-Subtitle-Generator/`
+- `Archive/09-Auto-Publisher/`
+- `Archive/10-Analytics/`
+- `Archive/11-Assets/`
+- `Archive/projects/`
