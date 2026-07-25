@@ -454,6 +454,7 @@
     {
       "parameters": {
         "jsCode": "// Purpose: Assemble the complete production package after QA passes.\n// Agent 6 publishing content is preserved exactly and no external generation service is called.\nconst data = $input.first()?.json || {};\nconst input = data.production_input || {};\nconst generatedAt = new Date().toISOString();\nconst packageData = { workflow: 'AI Health OS Video Generator', version: '1.0', status: 'success', source_workflow: input.source_workflow, source_master_run_id: input.source_master_run_id, model_adapter: data.model_adapter, topic: input.topic, product_name: input.product_name, video_title: input.video_title, hook: input.hook, full_script: input.full_script, canonical_scene_specification_version: data.canonical_scene_specification_version, scenes: data.canonical_scenes || [], video_prompts: data.video_prompts || [], image_prompts: data.image_prompts || [], voiceover: input.voiceover, voiceover_segments: input.voiceover_segments || [], subtitles: input.subtitles || [], subtitles_srt: input.subtitles_srt, publishing_package: input.publishing_package, ...(data.model_adapter === 'runway' ? { generated_video_results: Array.isArray(data.generated_video_results) ? data.generated_video_results : [], runway_execution: data.runway_execution || null } : {}), qa: data.production_qa, generated_at: generatedAt, ready_for_manual_generation: true, disclaimer: 'This workflow prepares prompts and production files only. It does not generate media, call external model APIs, upload content, or publish automatically. Human review is required.' };\nreturn [{ json: { ...data, production_package: packageData } }];\n"
+        "jsCode": "// Purpose: Assemble the complete production package after QA passes.\n// Agent 6 publishing content is preserved exactly and no external generation service is called.\nconst data = $input.first()?.json || {};\nconst input = data.production_input || {};\nconst generatedAt = new Date().toISOString();\nconst packageData = { workflow: 'AI Health OS Video Generator', version: '1.0', status: 'success', source_workflow: input.source_workflow, source_master_run_id: input.source_master_run_id, model_adapter: data.model_adapter, topic: input.topic, product_name: input.product_name, video_title: input.video_title, hook: input.hook, full_script: input.full_script, canonical_scene_specification_version: data.canonical_scene_specification_version, scenes: data.canonical_scenes || [], video_prompts: data.video_prompts || [], image_prompts: data.image_prompts || [], voiceover: input.voiceover, voiceover_segments: input.voiceover_segments || [], subtitles: input.subtitles || [], subtitles_srt: input.subtitles_srt, publishing_package: input.publishing_package, qa: data.production_qa, generated_at: generatedAt, ready_for_manual_generation: true, disclaimer: 'This workflow prepares prompts and production files only. It does not generate media, call external model APIs, upload content, or publish automatically. Human review is required.' };\nreturn [{ json: { ...data, production_package: packageData } }];\n"
       },
       "id": "build-package",
       "name": "Build Complete Production Package",
@@ -469,6 +470,7 @@
     {
       "parameters": {
         "jsCode": "// Purpose: Export the approved package as five named downloadable n8n binary artifacts.\n// Files are created in memory; this node does not write to the host filesystem or call external APIs.\nconst data = $input.first()?.json || {};\nconst p = data.production_package || {};\nfunction pretty(value) { return JSON.stringify(value, null, 2); }\nfunction binaryFile(content, fileName, mimeType) { return { data: Buffer.from(String(content ?? ''), 'utf8').toString('base64'), mimeType, fileName, fileExtension: fileName.split('.').pop() }; }\nconst videoJson = pretty({ workflow: p.workflow, version: p.version, model_adapter: p.model_adapter, source_master_run_id: p.source_master_run_id, video_title: p.video_title, canonical_scene_specification_version: p.canonical_scene_specification_version, video_prompts: p.video_prompts, ...(p.model_adapter === 'runway' ? { generated_video_results: p.generated_video_results || [], runway_execution: p.runway_execution || null } : {}) });\nconst imageJson = pretty({ workflow: p.workflow, version: p.version, source_master_run_id: p.source_master_run_id, video_title: p.video_title, image_prompts: p.image_prompts });\nconst voiceoverText = [`Title: ${p.video_title || ''}`, '', p.voiceover || '', '', 'Voiceover Segments', ...(p.voiceover_segments || []).map((s) => `${s.segment_number || ''} [${s.start_time_seconds ?? ''}-${s.end_time_seconds ?? ''}s] ${s.voiceover_text || s.text || ''}`)].join('\\n');\nconst md = ['# AI Health OS Video Production Package', '', `- Status: ${p.status}`, `- Model Adapter: ${p.model_adapter}`, `- Source Master Run ID: ${p.source_master_run_id || ''}`, `- Topic: ${p.topic || ''}`, `- Product: ${p.product_name || ''}`, `- Video Title: ${p.video_title || ''}`, `- QA Score: ${p.qa?.score ?? ''}`, '', '## Hook', '', p.hook || '', '', '## Full Script', '', p.full_script || '', '', '## Scene Production Plan', '', ...(p.scenes || []).flatMap((s) => [`### Scene ${s.scene_number}: ${s.scene_id}`, '', `- Duration: ${s.duration_seconds}s`, `- Subject: ${s.subject}`, `- Action: ${s.action}`, `- Environment: ${s.environment}`, `- Camera: ${s.camera?.shot_type || ''}; ${s.camera?.angle || ''}; ${s.camera?.movement || ''}`, `- Canonical Prompt: ${s.canonical_cinematic_prompt}`, `- Negative Prompt: ${s.canonical_negative_prompt}`, '']), '## Model-Adapted Video Prompts', '', '```json', pretty(p.video_prompts || []), '```', '', '## Image Prompts', '', '```json', pretty(p.image_prompts || []), '```', '', ...(p.model_adapter === 'runway' ? ['## Generated Runway Scene Videos', '', '```json', pretty(p.generated_video_results || []), '```', ''] : []), '## Publishing Package', '', '```json', pretty(p.publishing_package || {}), '```', '', '## QA', '', '```json', pretty(p.qa || {}), '```', '', '## Safety Boundary', '', p.disclaimer || ''].join('\\n');\nconst binary = { video_prompts: binaryFile(videoJson, 'video_prompts.json', 'application/json'), image_prompts: binaryFile(imageJson, 'image_prompts.json', 'application/json'), voiceover: binaryFile(voiceoverText, 'voiceover.txt', 'text/plain'), subtitles: binaryFile(p.subtitles_srt || '', 'subtitles.srt', 'application/x-subrip'), production_package: binaryFile(md, 'production_package.md', 'text/markdown') };\nreturn [{ json: { ...p, files: ['video_prompts.json', 'image_prompts.json', 'voiceover.txt', 'subtitles.srt', 'production_package.md'], file_count: 5 }, binary }];\n"
+        "jsCode": "// Purpose: Export the approved package as five named downloadable n8n binary artifacts.\n// Files are created in memory; this node does not write to the host filesystem or call external APIs.\nconst data = $input.first()?.json || {};\nconst p = data.production_package || {};\nfunction pretty(value) { return JSON.stringify(value, null, 2); }\nfunction binaryFile(content, fileName, mimeType) { return { data: Buffer.from(String(content ?? ''), 'utf8').toString('base64'), mimeType, fileName, fileExtension: fileName.split('.').pop() }; }\nconst videoJson = pretty({ workflow: p.workflow, version: p.version, model_adapter: p.model_adapter, source_master_run_id: p.source_master_run_id, video_title: p.video_title, canonical_scene_specification_version: p.canonical_scene_specification_version, video_prompts: p.video_prompts });\nconst imageJson = pretty({ workflow: p.workflow, version: p.version, source_master_run_id: p.source_master_run_id, video_title: p.video_title, image_prompts: p.image_prompts });\nconst voiceoverText = [`Title: ${p.video_title || ''}`, '', p.voiceover || '', '', 'Voiceover Segments', ...(p.voiceover_segments || []).map((s) => `${s.segment_number || ''} [${s.start_time_seconds ?? ''}-${s.end_time_seconds ?? ''}s] ${s.voiceover_text || s.text || ''}`)].join('\\n');\nconst md = ['# AI Health OS Video Production Package', '', `- Status: ${p.status}`, `- Model Adapter: ${p.model_adapter}`, `- Source Master Run ID: ${p.source_master_run_id || ''}`, `- Topic: ${p.topic || ''}`, `- Product: ${p.product_name || ''}`, `- Video Title: ${p.video_title || ''}`, `- QA Score: ${p.qa?.score ?? ''}`, '', '## Hook', '', p.hook || '', '', '## Full Script', '', p.full_script || '', '', '## Scene Production Plan', '', ...(p.scenes || []).flatMap((s) => [`### Scene ${s.scene_number}: ${s.scene_id}`, '', `- Duration: ${s.duration_seconds}s`, `- Subject: ${s.subject}`, `- Action: ${s.action}`, `- Environment: ${s.environment}`, `- Camera: ${s.camera?.shot_type || ''}; ${s.camera?.angle || ''}; ${s.camera?.movement || ''}`, `- Canonical Prompt: ${s.canonical_cinematic_prompt}`, `- Negative Prompt: ${s.canonical_negative_prompt}`, '']), '## Model-Adapted Video Prompts', '', '```json', pretty(p.video_prompts || []), '```', '', '## Image Prompts', '', '```json', pretty(p.image_prompts || []), '```', '', '## Publishing Package', '', '```json', pretty(p.publishing_package || {}), '```', '', '## QA', '', '```json', pretty(p.qa || {}), '```', '', '## Safety Boundary', '', p.disclaimer || ''].join('\\n');\nconst binary = { video_prompts: binaryFile(videoJson, 'video_prompts.json', 'application/json'), image_prompts: binaryFile(imageJson, 'image_prompts.json', 'application/json'), voiceover: binaryFile(voiceoverText, 'voiceover.txt', 'text/plain'), subtitles: binaryFile(p.subtitles_srt || '', 'subtitles.srt', 'application/x-subrip'), production_package: binaryFile(md, 'production_package.md', 'text/markdown') };\nreturn [{ json: { ...p, files: ['video_prompts.json', 'image_prompts.json', 'voiceover.txt', 'subtitles.srt', 'production_package.md'], file_count: 5 }, binary }];\n"
       },
       "id": "export-files",
       "name": "Export Production Files",
@@ -484,6 +486,7 @@
     {
       "parameters": {
         "jsCode": "// Purpose: Return the final production package summary and all five binary files to the caller.\n// The successful result is ready for human-reviewed generation, not automatic media production.\nconst item = $input.first() || { json: {}, binary: {} };\nconst data = item.json || {};\nreturn [{ json: { ...data, total_scenes: (data.scenes || []).length, video_prompt_count: (data.video_prompts || []).length, image_prompt_count: (data.image_prompts || []).filter((p) => p.required).length, qa_passed: Boolean(data.qa?.passed), ready_for_manual_generation: Boolean(data.ready_for_manual_generation), ...(data.model_adapter === 'runway' ? { generated_video_results: Array.isArray(data.generated_video_results) ? data.generated_video_results : [] } : {}), files: data.files || [] }, binary: item.binary || {} }];\n"
+        "jsCode": "// Purpose: Return the final production package summary and all five binary files to the caller.\n// The successful result is ready for human-reviewed generation, not automatic media production.\nconst item = $input.first() || { json: {}, binary: {} };\nconst data = item.json || {};\nreturn [{ json: { ...data, total_scenes: (data.scenes || []).length, video_prompt_count: (data.video_prompts || []).length, image_prompt_count: (data.image_prompts || []).filter((p) => p.required).length, qa_passed: Boolean(data.qa?.passed), ready_for_manual_generation: Boolean(data.ready_for_manual_generation), files: data.files || [] }, binary: item.binary || {} }];\n"
       },
       "id": "success-output",
       "name": "AI Health OS Video Generator Output",
@@ -1328,6 +1331,15 @@
         [
           {
             "node": "AI Health OS Video Generator Error Output",
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse Final Report",
             "type": "main",
             "index": 0
           }
@@ -1339,6 +1351,11 @@
         [
           {
             "node": "Production Package QA",
+    "Parse Final Report": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
             "type": "main",
             "index": 0
           }
@@ -1350,6 +1367,11 @@
         [
           {
             "node": "Production QA Passed?",
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Input Valid?",
             "type": "main",
             "index": 0
           }
@@ -1361,6 +1383,11 @@
         [
           {
             "node": "Build Complete Production Package",
+    "Input Valid?": {
+      "main": [
+        [
+          {
+            "node": "Extract Production Inputs",
             "type": "main",
             "index": 0
           }
@@ -1368,6 +1395,7 @@
         [
           {
             "node": "Build Production Error",
+            "node": "Build Validation Error",
             "type": "main",
             "index": 0
           }
@@ -1375,6 +1403,7 @@
       ]
     },
     "Build Production Error": {
+    "Build Validation Error": {
       "main": [
         [
           {
@@ -1401,6 +1430,11 @@
         [
           {
             "node": "AI Health OS Video Generator Output",
+    "Extract Production Inputs": {
+      "main": [
+        [
+          {
+            "node": "Build Canonical Scene Specifications",
             "type": "main",
             "index": 0
           }
@@ -1412,6 +1446,11 @@
         [
           {
             "node": "Loop Over Runway Scenes",
+    "Build Canonical Scene Specifications": {
+      "main": [
+        [
+          {
+            "node": "Generate Canonical Cinematic Prompts",
             "type": "main",
             "index": 0
           }
@@ -1423,6 +1462,11 @@
         [
           {
             "node": "Capture Runway Job ID",
+    "Generate Canonical Cinematic Prompts": {
+      "main": [
+        [
+          {
+            "node": "Model Adapter Layer",
             "type": "main",
             "index": 0
           }
@@ -1434,6 +1478,11 @@
         [
           {
             "node": "Runway Submission Accepted?",
+    "Model Adapter Layer": {
+      "main": [
+        [
+          {
+            "node": "Use Veo 3 Adapter?",
             "type": "main",
             "index": 0
           }
@@ -1445,6 +1494,11 @@
         [
           {
             "node": "Wait for Runway Job",
+    "Use Veo 3 Adapter?": {
+      "main": [
+        [
+          {
+            "node": "Veo 3 Adapter",
             "type": "main",
             "index": 0
           }
@@ -1496,6 +1550,7 @@
         [
           {
             "node": "Runway Job Completed?",
+            "node": "Use Runway Adapter?",
             "type": "main",
             "index": 0
           }
@@ -1507,6 +1562,11 @@
         [
           {
             "node": "Collect Runway Video URL",
+    "Use Runway Adapter?": {
+      "main": [
+        [
+          {
+            "node": "Runway Adapter",
             "type": "main",
             "index": 0
           }
@@ -1514,6 +1574,7 @@
         [
           {
             "node": "Runway Job Failed?",
+            "node": "Use Kling Adapter?",
             "type": "main",
             "index": 0
           }
@@ -1525,6 +1586,11 @@
         [
           {
             "node": "Build Runway API Failure",
+    "Use Kling Adapter?": {
+      "main": [
+        [
+          {
+            "node": "Kling Adapter",
             "type": "main",
             "index": 0
           }
@@ -1543,6 +1609,7 @@
         [
           {
             "node": "Runway Poll Limit Reached?",
+            "node": "Use Hailuo Adapter?",
             "type": "main",
             "index": 0
           }
@@ -1554,6 +1621,11 @@
         [
           {
             "node": "Build Runway Timeout",
+    "Use Hailuo Adapter?": {
+      "main": [
+        [
+          {
+            "node": "Hailuo Adapter",
             "type": "main",
             "index": 0
           }
@@ -1583,6 +1655,7 @@
         [
           {
             "node": "Loop Over Runway Scenes",
+            "node": "Build Model Adapter Error",
             "type": "main",
             "index": 0
           }
@@ -1594,6 +1667,11 @@
         [
           {
             "node": "Loop Over Runway Scenes",
+    "Veo 3 Adapter": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
             "type": "main",
             "index": 0
           }
@@ -1605,6 +1683,11 @@
         [
           {
             "node": "Loop Over Runway Scenes",
+    "Runway Adapter": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
             "type": "main",
             "index": 0
           }
@@ -1616,6 +1699,11 @@
         [
           {
             "node": "Runway Execution Successful?",
+    "Kling Adapter": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
             "type": "main",
             "index": 0
           }
@@ -1623,6 +1711,7 @@
       ]
     },
     "Runway Execution Successful?": {
+    "Hailuo Adapter": {
       "main": [
         [
           {
@@ -1641,6 +1730,10 @@
       ]
     },
     "Build Runway Execution Error": {
+        ]
+      ]
+    },
+    "Build Model Adapter Error": {
       "main": [
         [
           {
@@ -1663,6 +1756,11 @@
         [
           {
             "node": "Prepare Runway Submission Attempt",
+    "Generate Image Prompts": {
+      "main": [
+        [
+          {
+            "node": "Production Package QA",
             "type": "main",
             "index": 0
           }
@@ -1674,6 +1772,11 @@
         [
           {
             "node": "Submit Runway Generation Job",
+    "Production Package QA": {
+      "main": [
+        [
+          {
+            "node": "Production QA Passed?",
             "type": "main",
             "index": 0
           }
@@ -1685,6 +1788,11 @@
         [
           {
             "node": "Increment Runway Submit Retry",
+    "Production QA Passed?": {
+      "main": [
+        [
+          {
+            "node": "Build Complete Production Package",
             "type": "main",
             "index": 0
           }
@@ -1692,6 +1800,7 @@
         [
           {
             "node": "Build Runway Submission Failure",
+            "node": "Build Production Error",
             "type": "main",
             "index": 0
           }
@@ -1703,6 +1812,11 @@
         [
           {
             "node": "Runway Submit Retries Exhausted?",
+    "Build Production Error": {
+      "main": [
+        [
+          {
+            "node": "AI Health OS Video Generator Error Output",
             "type": "main",
             "index": 0
           }
@@ -1721,6 +1835,11 @@
         [
           {
             "node": "Wait Before Runway Resubmit",
+    "Build Complete Production Package": {
+      "main": [
+        [
+          {
+            "node": "Export Production Files",
             "type": "main",
             "index": 0
           }
@@ -1732,6 +1851,11 @@
         [
           {
             "node": "Prepare Runway Submission Attempt",
+    "Export Production Files": {
+      "main": [
+        [
+          {
+            "node": "AI Health OS Video Generator Output",
             "type": "main",
             "index": 0
           }
