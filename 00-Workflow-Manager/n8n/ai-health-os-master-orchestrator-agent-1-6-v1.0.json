@@ -1,0 +1,1020 @@
+{
+  "name": "AI Health OS - Master Orchestrator Agent 1-6 V1.0",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "AI Health OS - Master Orchestrator Agent 1-6 V1.0",
+        "formDescription": "输入主题后，总控工作流按顺序调用 Agent 1 到 Agent 6，不自动发布、不上传、不调用外部 TTS、不开发 Agent 7。",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "topic",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "例如：Rooibos Tea Before Bed"
+            },
+            {
+              "fieldLabel": "product_name",
+              "fieldType": "text",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "target_audience",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "US wellness audience"
+            },
+            {
+              "fieldLabel": "target_platform",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "TikTok"
+            },
+            {
+              "fieldLabel": "video_duration_seconds",
+              "fieldType": "number",
+              "requiredField": false,
+              "placeholder": "30"
+            },
+            {
+              "fieldLabel": "language",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "en-US"
+            },
+            {
+              "fieldLabel": "brand_tone",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "warm, calm, educational, trustworthy"
+            },
+            {
+              "fieldLabel": "additional_requirements",
+              "fieldType": "textarea",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "research_context",
+              "fieldType": "textarea",
+              "requiredField": false,
+              "placeholder": "可选：粘贴研究资料、用户记忆或内容背景。"
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "path": "ai-health-os-master-orchestrator-agent-1-6-v1"
+        }
+      },
+      "id": "master-form",
+      "name": "1. AI Health OS Master Input",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -2600,
+        0
+      ],
+      "webhookId": "master-orchestrator-agent-1-6-v1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first()?.json || {};\nconst startedAt = new Date().toISOString();\nconst masterRunId = input.master_run_id || `master_${Date.now()}`;\nfunction text(value, fallback = '') { const valueText = String(value ?? '').trim(); return valueText || fallback; }\nconst topic = text(input.topic || input.title, 'Rooibos Tea Before Bed');\nconst productName = text(input.product_name, '');\nconst targetAudience = text(input.target_audience, 'US wellness audience');\nconst targetPlatform = text(input.target_platform, 'TikTok');\nconst duration = Number(input.video_duration_seconds || 30);\nconst language = text(input.language, 'en-US');\nconst brandTone = text(input.brand_tone, 'warm, calm, educational, trustworthy');\nconst additionalRequirements = text(input.additional_requirements, '');\nconst csv = ['title,ingredient,angle,target_audience,curiosity,pain,product_fit,visual_potential,repeatability,suggested_hook', `\"${topic.replace(/\"/g, '\"\"')}\",\"${productName.replace(/\"/g, '\"\"')}\",\"${additionalRequirements.replace(/\"/g, '\"\"')}\",\"${targetAudience.replace(/\"/g, '\"\"')}\",4,4,4,4,4,\"${topic.replace(/\"/g, '\"\"')}\"`].join('\\n');\nreturn [{ json: { workflow: 'AI Health OS Master Orchestrator', version: '1.0', master_run_id: masterRunId, started_at: startedAt, topic, product_name: productName, target_audience: targetAudience, target_platform: targetPlatform, video_duration_seconds: duration, language, brand_tone: brandTone, additional_requirements: additionalRequirements, today_focus: topic, today_limit: 5, title: topic, health_topics_csv: csv, agent1_json: JSON.stringify({ topic, product_name: productName, target_audience: targetAudience, target_platform: targetPlatform, video_duration_seconds: duration, language, brand_tone: brandTone, additional_requirements: additionalRequirements, health_topics_csv: csv }) } }];"
+      },
+      "id": "prep-1",
+      "name": "Prepare Agent 1 Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2380,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "agent_1-execute-workflow-v13",
+      "name": "Execute Agent 1",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -2160,
+        0
+      ],
+      "continueOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const executeData = $input.first()?.json || {};\nconst previousState = (typeof $ === 'function' ? ($('Prepare Agent 1 Input').first()?.json || {}) : {});\nconst data = { ...previousState, ...executeData };\nconst agentName = 'agent_1';\nfunction stripMarkdownFence(value) {{\n  const text = typeof value === 'string' ? value.trim() : value;\n  if (typeof text !== 'string') return text;\n  return text.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```$/i, '').trim();\n}}\nfunction parseMaybe(value) {{\n  const clean = stripMarkdownFence(value);\n  if (typeof clean === 'string') return JSON.parse(clean);\n  return clean;\n}}\nfunction unwrapExecuteWorkflow(value) {{\n  let current = value;\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  if (current && typeof current === 'object' && current.json && Object.keys(current).length <= 2) current = current.json;\n  if (current && typeof current === 'object' && current.data && (current.data.workflow || current.data.status || Array.isArray(current.data))) current = current.data;\n  if (current && typeof current === 'object' && typeof current.output === 'string') {{ try {{ current = JSON.parse(stripMarkdownFence(current.output)); }} catch (error) {{}} }}\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  return current;\n}}\nfunction asArray(value, keys) {{\n  const unwrapped = unwrapExecuteWorkflow(value);\n  if (Array.isArray(unwrapped)) return unwrapped;\n  if (!unwrapped || typeof unwrapped !== 'object') return [];\n  for (const key of keys) if (Array.isArray(unwrapped[key])) return unwrapped[key];\n  return [];\n}}\nfunction truthy(value) {{\n  if (value === true || value === 1) return true;\n  const normalized = String(value ?? '').trim().toLowerCase();\n  return normalized === 'true' || normalized === 'yes' || normalized === '1';\n}}\nconst rawOutput = unwrapExecuteWorkflow(parseMaybe(executeData));\nconst status = rawOutput?.status || (Array.isArray(rawOutput) ? 'success' : 'unknown');\nconst parseError = rawOutput?.parse_error || '';\nconst executionError = rawOutput?.error?.message || rawOutput?.error || rawOutput?.message || '';\nlet success = status === 'success' || status === 'parsed' || status === 'qa_complete' || status === 'ready_for_publishing_package';\nlet errorMessage = executionError ? String(executionError) : '';\nif (executionError) success = false;\nconst ranked = asArray(rawOutput, ['ranked_topics', 'top_topics', 'results', 'topics', 'records']);\nif (!success && !errorMessage) errorMessage = `Agent 1 status is ${status}`;\nelse if (!executionError && ranked.length === 0) { success = false; errorMessage = 'Agent 1 没有输出可交给 Agent 2 的选题。'; }\nconst normalized = { ...data, [`agent_1_output`]: rawOutput, [`agent_1_status`]: success ? 'success' : 'failed', status: success ? 'success' : 'error', current_agent: agentName, success, failed_agent: success ? '' : agentName, failed_step: success ? '' : 'Agent 1 Success Check', error_message: success ? '' : errorMessage, parse_error: parseError, raw_output: rawOutput };\nreturn [{ json: normalized }];"
+      },
+      "id": "norm-1",
+      "name": "Normalize Agent 1 Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1940,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success-1",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-1",
+      "name": "Agent 1 Success Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nconst previous = data.agent_1_output || data.raw_output || data;\nreturn [{ json: { ...data, agent1_json: JSON.stringify(previous), approved_topics: data.topic || data.title || '', agent_1_output: previous } }];"
+      },
+      "id": "prep-2",
+      "name": "Prepare Agent 2 Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1500,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "agent_2-execute-workflow-v13",
+      "name": "Execute Agent 2",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -1280,
+        0
+      ],
+      "continueOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const executeData = $input.first()?.json || {};\nconst previousState = (typeof $ === 'function' ? ($('Prepare Agent 2 Input').first()?.json || {}) : {});\nconst data = { ...previousState, ...executeData };\nconst agentName = 'agent_2';\nfunction stripMarkdownFence(value) {{\n  const text = typeof value === 'string' ? value.trim() : value;\n  if (typeof text !== 'string') return text;\n  return text.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```$/i, '').trim();\n}}\nfunction parseMaybe(value) {{\n  const clean = stripMarkdownFence(value);\n  if (typeof clean === 'string') return JSON.parse(clean);\n  return clean;\n}}\nfunction unwrapExecuteWorkflow(value) {{\n  let current = value;\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  if (current && typeof current === 'object' && current.json && Object.keys(current).length <= 2) current = current.json;\n  if (current && typeof current === 'object' && current.data && (current.data.workflow || current.data.status || Array.isArray(current.data))) current = current.data;\n  if (current && typeof current === 'object' && typeof current.output === 'string') {{ try {{ current = JSON.parse(stripMarkdownFence(current.output)); }} catch (error) {{}} }}\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  return current;\n}}\nfunction asArray(value, keys) {{\n  const unwrapped = unwrapExecuteWorkflow(value);\n  if (Array.isArray(unwrapped)) return unwrapped;\n  if (!unwrapped || typeof unwrapped !== 'object') return [];\n  for (const key of keys) if (Array.isArray(unwrapped[key])) return unwrapped[key];\n  return [];\n}}\nfunction truthy(value) {{\n  if (value === true || value === 1) return true;\n  const normalized = String(value ?? '').trim().toLowerCase();\n  return normalized === 'true' || normalized === 'yes' || normalized === '1';\n}}\nconst rawOutput = unwrapExecuteWorkflow(parseMaybe(executeData));\nconst status = rawOutput?.status || (Array.isArray(rawOutput) ? 'success' : 'unknown');\nconst parseError = rawOutput?.parse_error || '';\nconst executionError = rawOutput?.error?.message || rawOutput?.error || rawOutput?.message || '';\nlet success = status === 'success' || status === 'parsed' || status === 'qa_complete' || status === 'ready_for_publishing_package';\nlet errorMessage = executionError ? String(executionError) : '';\nif (executionError) success = false;\nconst compliance = asArray(rawOutput, ['compliance_results', 'results', 'records']);\nconst readyCount = Number(rawOutput?.handoff?.ready_count || 0) || compliance.filter((item) => truthy(item.ready_for_agent3)).length;\nif (!success && !errorMessage) errorMessage = `Agent 2 status is ${status}`;\nelse if (!executionError && readyCount < 1) { success = false; errorMessage = 'Agent 2 没有 ready_for_agent3 = true 的内容。'; }\nconst normalized = { ...data, [`agent_2_output`]: rawOutput, [`agent_2_status`]: success ? 'success' : 'failed', status: success ? 'success' : 'error', current_agent: agentName, success, failed_agent: success ? '' : agentName, failed_step: success ? '' : 'Agent 2 Success Check', error_message: success ? '' : errorMessage, parse_error: parseError, raw_output: rawOutput };\nreturn [{ json: normalized }];"
+      },
+      "id": "norm-2",
+      "name": "Normalize Agent 2 Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1060,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success-2",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-2",
+      "name": "Agent 2 Success Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -840,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nconst previous = data.agent_2_output || data.raw_output || data;\nreturn [{ json: { ...data, agent2_json: JSON.stringify(previous), agent_2_output: previous } }];"
+      },
+      "id": "prep-3",
+      "name": "Prepare Agent 3 Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2600,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "agent_3-execute-workflow-v13",
+      "name": "Execute Agent 3",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -2380,
+        260
+      ],
+      "continueOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const executeData = $input.first()?.json || {};\nconst previousState = (typeof $ === 'function' ? ($('Prepare Agent 3 Input').first()?.json || {}) : {});\nconst data = { ...previousState, ...executeData };\nconst agentName = 'agent_3';\nfunction stripMarkdownFence(value) {{\n  const text = typeof value === 'string' ? value.trim() : value;\n  if (typeof text !== 'string') return text;\n  return text.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```$/i, '').trim();\n}}\nfunction parseMaybe(value) {{\n  const clean = stripMarkdownFence(value);\n  if (typeof clean === 'string') return JSON.parse(clean);\n  return clean;\n}}\nfunction unwrapExecuteWorkflow(value) {{\n  let current = value;\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  if (current && typeof current === 'object' && current.json && Object.keys(current).length <= 2) current = current.json;\n  if (current && typeof current === 'object' && current.data && (current.data.workflow || current.data.status || Array.isArray(current.data))) current = current.data;\n  if (current && typeof current === 'object' && typeof current.output === 'string') {{ try {{ current = JSON.parse(stripMarkdownFence(current.output)); }} catch (error) {{}} }}\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  return current;\n}}\nfunction asArray(value, keys) {{\n  const unwrapped = unwrapExecuteWorkflow(value);\n  if (Array.isArray(unwrapped)) return unwrapped;\n  if (!unwrapped || typeof unwrapped !== 'object') return [];\n  for (const key of keys) if (Array.isArray(unwrapped[key])) return unwrapped[key];\n  return [];\n}}\nfunction truthy(value) {{\n  if (value === true || value === 1) return true;\n  const normalized = String(value ?? '').trim().toLowerCase();\n  return normalized === 'true' || normalized === 'yes' || normalized === '1';\n}}\nconst rawOutput = unwrapExecuteWorkflow(parseMaybe(executeData));\nconst status = rawOutput?.status || (Array.isArray(rawOutput) ? 'success' : 'unknown');\nconst parseError = rawOutput?.parse_error || '';\nconst executionError = rawOutput?.error?.message || rawOutput?.error || rawOutput?.message || '';\nlet success = status === 'success' || status === 'parsed' || status === 'qa_complete' || status === 'ready_for_publishing_package';\nlet errorMessage = executionError ? String(executionError) : '';\nif (executionError) success = false;\nconst scripts = asArray(rawOutput, ['scripts', 'script_results', 'results', 'records']);\nconst readyCount = Number(rawOutput?.handoff?.ready_count || 0) || scripts.filter((item) => truthy(item.ready_for_agent4) || truthy(item.ready_for_next_agent) || item.qa_passed === true).length;\nif (!success && !errorMessage) errorMessage = `Agent 3 status is ${status}`;\nelse if (!executionError && (scripts.length < 1 || readyCount < 1)) { success = false; errorMessage = 'Agent 3 没有生成可进入 Agent 4 的脚本。'; }\nconst normalized = { ...data, [`agent_3_output`]: rawOutput, [`agent_3_status`]: success ? 'success' : 'failed', status: success ? 'success' : 'error', current_agent: agentName, success, failed_agent: success ? '' : agentName, failed_step: success ? '' : 'Agent 3 Success Check', error_message: success ? '' : errorMessage, parse_error: parseError, raw_output: rawOutput };\nreturn [{ json: normalized }];"
+      },
+      "id": "norm-3",
+      "name": "Normalize Agent 3 Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2160,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success-3",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-3",
+      "name": "Agent 3 Success Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1940,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nconst previous = data.agent_3_output || data.raw_output || data;\nreturn [{ json: { ...data, agent3_json: JSON.stringify(previous), agent_3_output: previous } }];"
+      },
+      "id": "prep-4",
+      "name": "Prepare Agent 4 Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1720,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "agent_4-execute-workflow-v13",
+      "name": "Execute Agent 4",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -1500,
+        260
+      ],
+      "continueOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const executeData = $input.first()?.json || {};\nconst previousState = (typeof $ === 'function' ? ($('Prepare Agent 4 Input').first()?.json || {}) : {});\nconst data = { ...previousState, ...executeData };\nconst agentName = 'agent_4';\nfunction stripMarkdownFence(value) {{\n  const text = typeof value === 'string' ? value.trim() : value;\n  if (typeof text !== 'string') return text;\n  return text.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```$/i, '').trim();\n}}\nfunction parseMaybe(value) {{\n  const clean = stripMarkdownFence(value);\n  if (typeof clean === 'string') return JSON.parse(clean);\n  return clean;\n}}\nfunction unwrapExecuteWorkflow(value) {{\n  let current = value;\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  if (current && typeof current === 'object' && current.json && Object.keys(current).length <= 2) current = current.json;\n  if (current && typeof current === 'object' && current.data && (current.data.workflow || current.data.status || Array.isArray(current.data))) current = current.data;\n  if (current && typeof current === 'object' && typeof current.output === 'string') {{ try {{ current = JSON.parse(stripMarkdownFence(current.output)); }} catch (error) {{}} }}\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  return current;\n}}\nfunction asArray(value, keys) {{\n  const unwrapped = unwrapExecuteWorkflow(value);\n  if (Array.isArray(unwrapped)) return unwrapped;\n  if (!unwrapped || typeof unwrapped !== 'object') return [];\n  for (const key of keys) if (Array.isArray(unwrapped[key])) return unwrapped[key];\n  return [];\n}}\nfunction truthy(value) {{\n  if (value === true || value === 1) return true;\n  const normalized = String(value ?? '').trim().toLowerCase();\n  return normalized === 'true' || normalized === 'yes' || normalized === '1';\n}}\nconst rawOutput = unwrapExecuteWorkflow(parseMaybe(executeData));\nconst status = rawOutput?.status || (Array.isArray(rawOutput) ? 'success' : 'unknown');\nconst parseError = rawOutput?.parse_error || '';\nconst executionError = rawOutput?.error?.message || rawOutput?.error || rawOutput?.message || '';\nlet success = status === 'success' || status === 'parsed' || status === 'qa_complete' || status === 'ready_for_publishing_package';\nlet errorMessage = executionError ? String(executionError) : '';\nif (executionError) success = false;\nconst visualPlans = asArray(rawOutput, ['visual_plans', 'visual_projects', 'results', 'records']);\nconst readyCount = Number(rawOutput?.handoff?.ready_count || 0) || visualPlans.filter((item) => truthy(item.ready_for_agent5)).length;\nif (!success && !errorMessage) errorMessage = `Agent 4 status is ${status}`;\nelse if (!executionError && (visualPlans.length < 1 || readyCount < 1)) { success = false; errorMessage = 'Agent 4 没有 ready_for_agent5 = true 的视觉方案。'; }\nconst normalized = { ...data, [`agent_4_output`]: rawOutput, [`agent_4_status`]: success ? 'success' : 'failed', status: success ? 'success' : 'error', current_agent: agentName, success, failed_agent: success ? '' : agentName, failed_step: success ? '' : 'Agent 4 Success Check', error_message: success ? '' : errorMessage, parse_error: parseError, raw_output: rawOutput };\nreturn [{ json: normalized }];"
+      },
+      "id": "norm-4",
+      "name": "Normalize Agent 4 Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1280,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success-4",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-4",
+      "name": "Agent 4 Success Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1060,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nconst previous = data.agent_4_output || data.raw_output || data;\nreturn [{ json: { ...data, agent4_json: JSON.stringify(previous), agent_4_output: previous } }];"
+      },
+      "id": "prep-5",
+      "name": "Prepare Agent 5 Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2600,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "agent_5-execute-workflow-v13",
+      "name": "Execute Agent 5",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -2380,
+        520
+      ],
+      "continueOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const executeData = $input.first()?.json || {};\nconst previousState = (typeof $ === 'function' ? ($('Prepare Agent 5 Input').first()?.json || {}) : {});\nconst data = { ...previousState, ...executeData };\nconst agentName = 'agent_5';\nfunction stripMarkdownFence(value) {{\n  const text = typeof value === 'string' ? value.trim() : value;\n  if (typeof text !== 'string') return text;\n  return text.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```$/i, '').trim();\n}}\nfunction parseMaybe(value) {{\n  const clean = stripMarkdownFence(value);\n  if (typeof clean === 'string') return JSON.parse(clean);\n  return clean;\n}}\nfunction unwrapExecuteWorkflow(value) {{\n  let current = value;\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  if (current && typeof current === 'object' && current.json && Object.keys(current).length <= 2) current = current.json;\n  if (current && typeof current === 'object' && current.data && (current.data.workflow || current.data.status || Array.isArray(current.data))) current = current.data;\n  if (current && typeof current === 'object' && typeof current.output === 'string') {{ try {{ current = JSON.parse(stripMarkdownFence(current.output)); }} catch (error) {{}} }}\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  return current;\n}}\nfunction asArray(value, keys) {{\n  const unwrapped = unwrapExecuteWorkflow(value);\n  if (Array.isArray(unwrapped)) return unwrapped;\n  if (!unwrapped || typeof unwrapped !== 'object') return [];\n  for (const key of keys) if (Array.isArray(unwrapped[key])) return unwrapped[key];\n  return [];\n}}\nfunction truthy(value) {{\n  if (value === true || value === 1) return true;\n  const normalized = String(value ?? '').trim().toLowerCase();\n  return normalized === 'true' || normalized === 'yes' || normalized === '1';\n}}\nconst rawOutput = unwrapExecuteWorkflow(parseMaybe(executeData));\nconst status = rawOutput?.status || (Array.isArray(rawOutput) ? 'success' : 'unknown');\nconst parseError = rawOutput?.parse_error || '';\nconst executionError = rawOutput?.error?.message || rawOutput?.error || rawOutput?.message || '';\nlet success = status === 'success' || status === 'parsed' || status === 'qa_complete' || status === 'ready_for_publishing_package';\nlet errorMessage = executionError ? String(executionError) : '';\nif (executionError) success = false;\nconst voiceoverPackages = asArray(rawOutput, ['voiceover_packages', 'results', 'records']);\nconst readyCount = Number(rawOutput?.handoff?.ready_count || 0) || voiceoverPackages.filter((item) => truthy(item.ready_for_agent6) || item.qa_passed === true).length;\nif (!success && !errorMessage) errorMessage = `Agent 5 status is ${status}`;\nelse if (!executionError && (voiceoverPackages.length < 1 || readyCount < 1)) { success = false; errorMessage = 'Agent 5 没有 ready_for_agent6 = true 的配音字幕包。'; }\nconst normalized = { ...data, [`agent_5_output`]: rawOutput, [`agent_5_status`]: success ? 'success' : 'failed', status: success ? 'success' : 'error', current_agent: agentName, success, failed_agent: success ? '' : agentName, failed_step: success ? '' : 'Agent 5 Success Check', error_message: success ? '' : errorMessage, parse_error: parseError, raw_output: rawOutput };\nreturn [{ json: normalized }];"
+      },
+      "id": "norm-5",
+      "name": "Normalize Agent 5 Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2160,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success-5",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-5",
+      "name": "Agent 5 Success Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1940,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nconst previous = data.agent_5_output || data.raw_output || data;\nreturn [{ json: { ...data, agent5_json: JSON.stringify(previous), agent_5_output: previous } }];"
+      },
+      "id": "prep-6",
+      "name": "Prepare Agent 6 Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1720,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "agent_6-execute-workflow-v13",
+      "name": "Execute Agent 6",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -1500,
+        520
+      ],
+      "continueOnFail": true,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const executeData = $input.first()?.json || {};\nconst previousState = (typeof $ === 'function' ? ($('Prepare Agent 6 Input').first()?.json || {}) : {});\nconst data = { ...previousState, ...executeData };\nconst agentName = 'agent_6';\nfunction stripMarkdownFence(value) {{\n  const text = typeof value === 'string' ? value.trim() : value;\n  if (typeof text !== 'string') return text;\n  return text.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```$/i, '').trim();\n}}\nfunction parseMaybe(value) {{\n  const clean = stripMarkdownFence(value);\n  if (typeof clean === 'string') return JSON.parse(clean);\n  return clean;\n}}\nfunction unwrapExecuteWorkflow(value) {{\n  let current = value;\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  if (current && typeof current === 'object' && current.json && Object.keys(current).length <= 2) current = current.json;\n  if (current && typeof current === 'object' && current.data && (current.data.workflow || current.data.status || Array.isArray(current.data))) current = current.data;\n  if (current && typeof current === 'object' && typeof current.output === 'string') {{ try {{ current = JSON.parse(stripMarkdownFence(current.output)); }} catch (error) {{}} }}\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  return current;\n}}\nfunction asArray(value, keys) {{\n  const unwrapped = unwrapExecuteWorkflow(value);\n  if (Array.isArray(unwrapped)) return unwrapped;\n  if (!unwrapped || typeof unwrapped !== 'object') return [];\n  for (const key of keys) if (Array.isArray(unwrapped[key])) return unwrapped[key];\n  return [];\n}}\nfunction truthy(value) {{\n  if (value === true || value === 1) return true;\n  const normalized = String(value ?? '').trim().toLowerCase();\n  return normalized === 'true' || normalized === 'yes' || normalized === '1';\n}}\nconst rawOutput = unwrapExecuteWorkflow(parseMaybe(executeData));\nconst status = rawOutput?.status || (Array.isArray(rawOutput) ? 'success' : 'unknown');\nconst parseError = rawOutput?.parse_error || '';\nconst executionError = rawOutput?.error?.message || rawOutput?.error || rawOutput?.message || '';\nlet success = status === 'success' || status === 'parsed' || status === 'qa_complete' || status === 'ready_for_publishing_package';\nlet errorMessage = executionError ? String(executionError) : '';\nif (executionError) success = false;\nconst publishingPackages = asArray(rawOutput, ['publishing_packages', 'results', 'records']);\nconst readyCount = Number(rawOutput?.handoff?.ready_count || 0) || publishingPackages.filter((item) => truthy(item.ready_for_manual_publish) || item.qa_passed === true).length;\nif (!success && !errorMessage) errorMessage = `Agent 6 status is ${status}`;\nelse if (!executionError && (publishingPackages.length < 1 || readyCount < 1)) { success = false; errorMessage = 'Agent 6 没有 ready_for_manual_publish = true 的发布包。'; }\nconst normalized = { ...data, [`agent_6_output`]: rawOutput, [`agent_6_status`]: success ? 'success' : 'failed', status: success ? 'success' : 'error', current_agent: agentName, success, failed_agent: success ? '' : agentName, failed_step: success ? '' : 'Agent 6 Success Check', error_message: success ? '' : errorMessage, parse_error: parseError, raw_output: rawOutput };\nreturn [{ json: normalized }];"
+      },
+      "id": "norm-6",
+      "name": "Normalize Agent 6 Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1280,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success-6",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-6",
+      "name": "Agent 6 Success Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1060,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nconst generatedAt = new Date().toISOString();\nconst failedAgent = data.failed_agent || data.current_agent || 'unknown';\nconst message = data.error_message || data.parse_error || `${failedAgent} 未通过 Success Check。`;\nconst lastSuccessfulAgent = ['agent_6','agent_5','agent_4','agent_3','agent_2','agent_1'].find((agent) => data[`${agent}_status`] === 'success') || '';\nconst report = ['# AI Health OS Master Orchestrator Report', '', '## 一、本次运行结果', '', '- 总状态：failed', `- Master Run ID：${data.master_run_id || ''}`, `- 失败 Agent：${failedAgent}`, `- 失败步骤：${data.failed_step || ''}`, `- 错误原因：${message}`, '', '## 二、建议操作', '', `- 请检查 ${failedAgent} 的输入 JSON、Success Check 节点和上一个 Agent 的完整输出。`, '- 修复失败 Agent 后重新从 Master Input 运行。', '- 不要手动跳过中间 Agent。'].join('\\n');\nreturn [{ json: { workflow: 'AI Health OS Master Orchestrator', version: '1.0', status: 'failed', master_run_id: data.master_run_id || '', started_at: data.started_at || '', topic: data.topic || '', product_name: data.product_name || '', target_audience: data.target_audience || '', target_platform: data.target_platform || '', video_duration_seconds: data.video_duration_seconds || 30, language: data.language || '', brand_tone: data.brand_tone || '', additional_requirements: data.additional_requirements || '', failed_agent: failedAgent, failed_step: data.failed_step || '', error_message: message, parse_error: data.parse_error || '', last_successful_agent: lastSuccessfulAgent, generated_at: generatedAt, raw_output: data.raw_output || {}, suggested_action: `检查 ${failedAgent} 的输入、输出和 Success Check。`, report_markdown: report } }];"
+      },
+      "id": "error-report",
+      "name": "Unified Error Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -840,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first()?.json || {};\nif (data.status === 'failed') return [{ json: data }];\nconst completedAt = new Date().toISOString();\nfunction asArray(value) { return Array.isArray(value) ? value : []; }\nconst agent6 = data.agent_6_output || {};\nconst finalPackages = asArray(agent6.publishing_packages);\nconst readyPackages = finalPackages.filter((pkg) => pkg.ready_for_manual_publish || pkg.qa_passed);\nconst startedAt = data.started_at || completedAt;\nconst totalProcessingTime = `${Math.max(0, Date.parse(completedAt) - Date.parse(startedAt))}ms`;\nconst disclaimer = 'Agent 6 不会自动发布。最终发布前仍需人工审核。当前不要开发 Agent 7。';\nconst lines = ['# AI Health OS Master Orchestrator Report', '', '## 一、本次运行结果', '', '- 总状态：success', `- Master Run ID：${data.master_run_id || ''}`, `- 开始时间：${startedAt}`, `- 完成时间：${completedAt}`, `- 处理主题：${data.topic || ''}`, `- 产品名称：${data.product_name || ''}`, `- 目标平台：${data.target_platform || ''}`, '', '## 二、Agent 1 到 Agent 6 执行状态', '', `- Agent 1：${data.agent_1_status || 'unknown'}`, `- Agent 2：${data.agent_2_status || 'unknown'}`, `- Agent 3：${data.agent_3_status || 'unknown'}`, `- Agent 4：${data.agent_4_status || 'unknown'}`, `- Agent 5：${data.agent_5_status || 'unknown'}`, `- Agent 6：${data.agent_6_status || 'unknown'}`, '', '## 三、最终内容结果', ''];\nfor (const pkg of finalPackages) {\n  lines.push(`### ${pkg.video_title || 'Untitled Package'}`, '', `- 视频标题：${pkg.video_title || ''}`, `- Cover Text：${pkg.cover_text || ''}`, `- CTA：${pkg.cta || ''}`, `- TikTok Caption：${pkg.tiktok_caption || ''}`, `- Instagram Caption：${pkg.instagram_caption || ''}`, `- YouTube Shorts Caption：${pkg.youtube_shorts_caption || ''}`, `- Hashtags：${(pkg.hashtags || []).join(' ')}`, `- SEO Keywords：${(pkg.seo_keywords || []).join(', ')}`, `- Suggested Posting Time：${pkg.suggested_posting_time?.primary || ''} / ${pkg.suggested_posting_time?.secondary || ''}`, '', '#### Publishing Checklist');\n  for (const item of pkg.publishing_checklist || []) lines.push(`- ${item}`);\n  lines.push('', '#### Analytics Template', '```json', JSON.stringify(pkg.analytics_template || {}, null, 2), '```', '', '#### A/B Test Plan');\n  for (const test of pkg.ab_test_plan || []) lines.push(`- ${test.test_name}：A=${test.variant_a}｜B=${test.variant_b}｜指标=${test.success_metric}`);\n}\nlines.push('', '## 四、QA 结果', '', `- Agent 4 QA：${data.agent_4_output?.handoff?.ready_count || 0} ready`, `- Agent 5 QA：${data.agent_5_output?.handoff?.ready_count || 0} ready`, `- Agent 6 QA：${agent6.handoff?.ready_count || 0} ready`, `- QA Score：${finalPackages.map((pkg) => pkg.qa_score ?? '').filter((x) => x !== '').join(', ') || ''}`, `- QA Issues：${finalPackages.flatMap((pkg) => pkg.qa_issues || []).join('；') || '暂无'}`, `- 是否允许人工发布：${readyPackages.length > 0}`, '', '## 五、下一步', '', '- Agent 6 不会自动发布。', '- 最终发布前仍需要人工审核。', '- 当前不要开发 Agent 7。', '', '## 重要说明', '', disclaimer);\nreturn [{ json: { workflow: 'AI Health OS Master Orchestrator', version: '1.0', status: 'success', master_run_id: data.master_run_id || '', started_at: startedAt, topic: data.topic || '', product_name: data.product_name || '', target_audience: data.target_audience || '', target_platform: data.target_platform || '', video_duration_seconds: data.video_duration_seconds || 30, language: data.language || '', brand_tone: data.brand_tone || '', additional_requirements: data.additional_requirements || '', completed_at: completedAt, total_processing_time: totalProcessingTime, agent_results: { agent_1: data.agent_1_output, agent_2: data.agent_2_output, agent_3: data.agent_3_output, agent_4: data.agent_4_output, agent_5: data.agent_5_output, agent_6: agent6 }, agent_1_status: data.agent_1_status, agent_2_status: data.agent_2_status, agent_3_status: data.agent_3_status, agent_4_status: data.agent_4_status, agent_5_status: data.agent_5_status, agent_6_status: data.agent_6_status, final_publishing_packages: finalPackages, ready_for_manual_publish: readyPackages.length > 0, handoff: { next_step: 'manual_review_and_manual_publish', ready_count: readyPackages.length }, disclaimer, report_markdown: lines.join('\\n') } }];"
+      },
+      "id": "final-code",
+      "name": "Build Final Master Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -840,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "AI Health OS Final Report",
+        "completionMessage": "={{ \"状态：\" + $json.status + \"\\n\\n\" + $json.report_markdown + \"\\n\\n---\\n\\n最终 JSON：\\n```json\\n\" + JSON.stringify($json, null, 2) + \"\\n```\\n\\n最终 Publishing Package：\\n```json\\n\" + JSON.stringify($json.final_publishing_packages || [], null, 2) + \"\\n```\" }}",
+        "options": {}
+      },
+      "id": "final-form",
+      "name": "AI Health OS Final Report",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        -620,
+        520
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "1. AI Health OS Master Input": {
+      "main": [
+        [
+          {
+            "node": "Prepare Agent 1 Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Agent 1 Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Agent 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Agent 1": {
+      "main": [
+        [
+          {
+            "node": "Normalize Agent 1 Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Agent 1 Output": {
+      "main": [
+        [
+          {
+            "node": "Agent 1 Success Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 1 Success Check": {
+      "main": [
+        [
+          {
+            "node": "Prepare Agent 2 Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unified Error Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Agent 2 Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Agent 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Agent 2": {
+      "main": [
+        [
+          {
+            "node": "Normalize Agent 2 Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Agent 2 Output": {
+      "main": [
+        [
+          {
+            "node": "Agent 2 Success Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 2 Success Check": {
+      "main": [
+        [
+          {
+            "node": "Prepare Agent 3 Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unified Error Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Agent 3 Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Agent 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Agent 3": {
+      "main": [
+        [
+          {
+            "node": "Normalize Agent 3 Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Agent 3 Output": {
+      "main": [
+        [
+          {
+            "node": "Agent 3 Success Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 3 Success Check": {
+      "main": [
+        [
+          {
+            "node": "Prepare Agent 4 Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unified Error Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Agent 4 Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Agent 4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Agent 4": {
+      "main": [
+        [
+          {
+            "node": "Normalize Agent 4 Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Agent 4 Output": {
+      "main": [
+        [
+          {
+            "node": "Agent 4 Success Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 4 Success Check": {
+      "main": [
+        [
+          {
+            "node": "Prepare Agent 5 Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unified Error Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Agent 5 Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Agent 5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Agent 5": {
+      "main": [
+        [
+          {
+            "node": "Normalize Agent 5 Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Agent 5 Output": {
+      "main": [
+        [
+          {
+            "node": "Agent 5 Success Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 5 Success Check": {
+      "main": [
+        [
+          {
+            "node": "Prepare Agent 6 Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unified Error Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Agent 6 Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Agent 6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Agent 6": {
+      "main": [
+        [
+          {
+            "node": "Normalize Agent 6 Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Agent 6 Output": {
+      "main": [
+        [
+          {
+            "node": "Agent 6 Success Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent 6 Success Check": {
+      "main": [
+        [
+          {
+            "node": "Build Final Master Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unified Error Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unified Error Report": {
+      "main": [
+        [
+          {
+            "node": "AI Health OS Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Final Master Report": {
+      "main": [
+        [
+          {
+            "node": "AI Health OS Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "master-agent-1-6-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "ai-health-os-master-orchestrator-agent-1-6-v1",
+  "tags": []
+}
