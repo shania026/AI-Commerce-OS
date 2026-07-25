@@ -1,0 +1,205 @@
+{
+  "name": "AI Health OS - Agent 1 Memory MVP",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "AI Health OS - Agent 1 Memory MVP",
+        "formDescription": "上传 health_topics_csv。整个流程使用内存传递，不写入 /files、/home/node、Windows 路径或任何本地目录。",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "health_topics_csv",
+              "fieldType": "file",
+              "requiredField": true,
+              "acceptFileTypes": ".csv"
+            },
+            {
+              "fieldLabel": "today_limit",
+              "fieldType": "number",
+              "placeholder": "5",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "today_focus",
+              "fieldType": "textarea",
+              "placeholder": "例如：Rooibos caffeine-free evening routine",
+              "requiredField": false
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "path": "ai-health-os-agent1-memory-mvp"
+        }
+      },
+      "id": "18ac9e8b-784a-45c6-8b29-847e50e2f013",
+      "name": "1. 上传 CSV 表单",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -1320,
+        120
+      ],
+      "webhookId": "ai-health-os-agent1-memory-mvp"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 作用：标准化表单上传文件，只做内存字段整理。\n// 不使用 fs、不读写任何本地目录。\nconst item = $input.first();\nconst binary = item.binary || {};\nconst firstBinaryKey = Object.keys(binary)[0];\n\nif (!firstBinaryKey) {\n  throw new Error('没有收到 CSV 文件。请在表单的 health_topics_csv 字段上传 .csv 文件。');\n}\n\nconst limitFromForm = Number(item.json.today_limit || 5);\nconst safeLimit = Number.isFinite(limitFromForm) && limitFromForm > 0 ? Math.floor(limitFromForm) : 5;\n\nreturn [{\n  json: {\n    today_limit: safeLimit,\n    today_focus: item.json.today_focus || ''\n  },\n  binary: {\n    data: binary[firstBinaryKey]\n  }\n}];"
+      },
+      "id": "bf4d1871-c47e-45a0-9421-580fc1d27466",
+      "name": "2. 标准化上传文件",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1080,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "data",
+        "options": {
+          "delimiter": ",",
+          "encoding": "utf-8",
+          "headerRow": true
+        }
+      },
+      "id": "d4a43c23-3d07-4c50-924c-13f338467a2e",
+      "name": "3. CSV 转 JSON",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -840,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Agent 1 Memory MVP：只做数据处理，不操作文件系统。\n// 输入：Extract From File 节点输出的 CSV JSON 行。\n// 输出：JSON 排名结果 + Markdown 决策报告。\nfunction toScore(value) {\n  const number = Number(value);\n  if (!Number.isFinite(number)) return 1;\n  return Math.max(1, Math.min(5, Math.round(number)));\n}\n\nfunction escapeRegex(word) {\n  return word.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\n}\n\nfunction containsWord(text, word) {\n  return new RegExp('(^|[^a-zA-Z])' + escapeRegex(word) + '($|[^a-zA-Z])', 'i').test(text);\n}\n\nfunction normalizeText(value) {\n  return String(value || '').trim();\n}\n\nfunction getField(row, names) {\n  for (const name of names) {\n    if (row[name] !== undefined) return row[name];\n  }\n  return '';\n}\n\nfunction riskInfo(topic) {\n  const combined = [topic.title, topic.ingredient, topic.angle, topic.target_audience, topic.suggested_hook].join(' ');\n  const highRiskWords = ['cure', 'cures', 'treat', 'treats', 'treatment', 'prevent', 'prevents', 'reverse', 'reverses', 'diabetes', 'cancer', 'hypertension'];\n  const mediumRiskWords = ['pain', 'inflammation', 'blood sugar', 'detox', 'cleanse'];\n  const lowRiskWords = ['tea', 'caffeine', 'routine', 'evening routine', 'screen fatigue'];\n\n  const highHits = highRiskWords.filter((word) => containsWord(combined, word));\n  const mediumHits = mediumRiskWords.filter((word) => combined.toLowerCase().includes(word.toLowerCase()));\n  const lowHits = lowRiskWords.filter((word) => combined.toLowerCase().includes(word.toLowerCase()));\n\n  if (highHits.length > 0) {\n    return {\n      risk_score: 5,\n      risk_level: 'High',\n      risk_alert: '包含高风险健康词：' + highHits.join(', ') + '。不要直接制作，必须先改写。'\n    };\n  }\n  if (mediumHits.length > 0) {\n    return {\n      risk_score: 3,\n      risk_level: 'Medium',\n      risk_alert: '包含中等风险健康表达：' + mediumHits.join(', ') + '。建议弱化为日常健康习惯表达。'\n    };\n  }\n  if (lowHits.length > 0) {\n    return {\n      risk_score: 1,\n      risk_level: 'Low',\n      risk_alert: '偏日常健康习惯，命中低风险方向：' + lowHits.join(', ') + '。'\n    };\n  }\n  return {\n    risk_score: 1,\n    risk_level: 'Low',\n    risk_alert: '未发现明显高风险词，但仍需人工确认。'\n  };\n}\n\nfunction focusBonus(topic, todayFocus) {\n  const focus = normalizeText(todayFocus).toLowerCase();\n  if (!focus) return 0;\n\n  const combined = [topic.title, topic.ingredient, topic.angle, topic.target_audience, topic.suggested_hook].join(' ').toLowerCase();\n  const tokens = focus.split(/[^a-zA-Z0-9]+/).filter((token) => token.length >= 3);\n  if (tokens.length === 0) return 0;\n\n  const matched = tokens.filter((token) => combined.includes(token));\n  if (matched.length === 0) return 0;\n  return Math.min(5, matched.length * 2);\n}\n\nfunction recommendationFor(score, riskLevel) {\n  if (riskLevel === 'High') return 'No';\n  if (score >= 20) return 'Yes';\n  return 'No';\n}\n\nconst setup = $items('2. 标准化上传文件')[0].json;\nconst limit = Number(setup.today_limit || 5);\nconst todayFocus = setup.today_focus || '';\nconst rows = $input.all().map((item) => item.json);\n\nif (rows.length === 0) {\n  throw new Error('CSV 转换后没有任何数据行，请检查上传的 CSV。');\n}\n\nconst requiredFields = ['title', 'ingredient', 'angle', 'target_audience', 'curiosity', 'pain', 'product_fit', 'visual_potential', 'repeatability', 'suggested_hook'];\nconst firstRow = rows[0];\nconst missingFields = requiredFields.filter((field) => firstRow[field] === undefined);\nif (missingFields.length > 0) {\n  throw new Error('CSV 缺少必填字段：' + missingFields.join(', '));\n}\n\nconst scored = rows.map((row, index) => {\n  const topic = {\n    title: normalizeText(getField(row, ['title', 'topic'])),\n    ingredient: normalizeText(getField(row, ['ingredient', 'herb'])),\n    angle: normalizeText(getField(row, ['angle'])),\n    target_audience: normalizeText(getField(row, ['target_audience', 'audience'])),\n    suggested_hook: normalizeText(getField(row, ['suggested_hook', 'hook']))\n  };\n\n  const curiosity = toScore(row.curiosity);\n  const pain = toScore(row.pain);\n  const productFit = toScore(row.product_fit);\n  const visualPotential = toScore(row.visual_potential);\n  const repeatability = toScore(row.repeatability);\n  const risk = riskInfo(topic);\n  const bonus = focusBonus(topic, todayFocus);\n\n  const score = curiosity * 2 + pain * 2 + productFit + visualPotential + repeatability + bonus - risk.risk_score * 2;\n  const recommendation = recommendationFor(score, risk.risk_level);\n  const reason = recommendation === 'Yes'\n    ? '推荐制作：选题具备较好的好奇心、痛点或产品匹配度，且风险可控。'\n    : risk.risk_level === 'High'\n      ? '暂缓制作：存在高风险健康表达，需要先改写。'\n      : '暂缓制作：综合分数偏低，建议先优化标题、痛点或画面表达。';\n\n  return {\n    ranking: 0,\n    row_number: index + 2,\n    topic: topic.title,\n    title: topic.title,\n    ingredient: topic.ingredient,\n    angle: topic.angle,\n    target_audience: topic.target_audience,\n    score,\n    recommendation,\n    reason,\n    risk_level: risk.risk_level,\n    risk_alert: risk.risk_alert,\n    focus_bonus: bonus,\n    suggested_hook: topic.suggested_hook\n  };\n});\n\nconst ranked = scored\n  .sort((a, b) => b.score - a.score)\n  .slice(0, limit)\n  .map((item, index) => ({ ...item, ranking: index + 1 }));\n\nconst markdownLines = [];\nmarkdownLines.push('# AI Health OS - Agent 1 Memory MVP 决策报告');\nmarkdownLines.push('');\nmarkdownLines.push('## 今日推荐 Top ' + ranked.length + ' 选题');\nmarkdownLines.push('');\nif (todayFocus) {\n  markdownLines.push('- 今日重点方向：' + todayFocus);\n  markdownLines.push('');\n}\nmarkdownLines.push('| 排名 | 选题 | 分数 | 推荐 | 风险等级 |');\nmarkdownLines.push('| --- | --- | ---: | --- | --- |');\nranked.forEach((item) => {\n  markdownLines.push('| ' + item.ranking + ' | ' + item.title + ' | ' + item.score + ' | ' + item.recommendation + ' | ' + item.risk_level + ' |');\n});\nmarkdownLines.push('');\nmarkdownLines.push('## 详细说明');\nranked.forEach((item) => {\n  markdownLines.push('');\n  markdownLines.push('### ' + item.ranking + '. ' + item.title);\n  markdownLines.push('- 分数：' + item.score);\n  markdownLines.push('- 推荐：' + item.recommendation);\n  markdownLines.push('- 推荐原因：' + item.reason);\n  markdownLines.push('- 风险等级：' + item.risk_level);\n  markdownLines.push('- 风险提醒：' + item.risk_alert);\n  markdownLines.push('- 今日重点加分：' + item.focus_bonus);\n  markdownLines.push('- 开头钩子：' + item.suggested_hook);\n});\nmarkdownLines.push('');\nmarkdownLines.push('## 下一步');\nmarkdownLines.push('请先人工确认这份报告。确认前不要开发 Agent 2。');\n\nreturn [{\n  json: {\n    workflow_name: 'AI Health OS - Agent 1 Memory MVP',\n    today_limit: limit,\n    today_focus: todayFocus,\n    ranked_topics: ranked,\n    markdown_report: markdownLines.join('\\n')\n  }\n}];"
+      },
+      "id": "c80f5cd8-5585-4431-b919-7635af0fb4e2",
+      "name": "4. Agent 1 内存分析",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -600,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// JSON 最终输出分支：只输出排名结果，方便复制或给后续 Agent 使用。\nconst analysis = $input.first().json;\nreturn [{\n  json: {\n    output_type: 'json_ranking_result',\n    workflow_name: analysis.workflow_name,\n    today_limit: analysis.today_limit,\n    today_focus: analysis.today_focus,\n    ranked_topics: analysis.ranked_topics\n  }\n}];"
+      },
+      "id": "4fae2a4f-3f75-4d90-a402-126379174b7b",
+      "name": "5. JSON 排名结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -360,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Markdown 最终输出分支：输出给产品经理阅读的决策报告。\nconst analysis = $input.first().json;\nreturn [{\n  json: {\n    output_type: 'markdown_decision_report',\n    workflow_name: analysis.workflow_name,\n    markdown_report: analysis.markdown_report,\n    ranked_topics: analysis.ranked_topics\n  }\n}];"
+      },
+      "id": "909d5610-d226-4d47-a6a1-e8dfebf297ea",
+      "name": "6. Markdown 决策报告",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -360,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "AI Health OS 分析完成",
+        "completionMessage": "={{ $json.markdown_report + '\\n\\n---\\n\\nJSON 排名结果：\\n```json\\n' + JSON.stringify($json.ranked_topics, null, 2) + '\\n```' }}",
+        "options": {}
+      },
+      "id": "a43de9f4-7fef-44b0-9d3e-bf132c83b99d",
+      "name": "7. 显示结果给用户",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        -120,
+        240
+      ],
+      "webhookId": "ai-health-os-agent1-memory-mvp-done"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "1. 上传 CSV 表单": {
+      "main": [
+        [
+          {
+            "node": "2. 标准化上传文件",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. 标准化上传文件": {
+      "main": [
+        [
+          {
+            "node": "3. CSV 转 JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. CSV 转 JSON": {
+      "main": [
+        [
+          {
+            "node": "4. Agent 1 内存分析",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Agent 1 内存分析": {
+      "main": [
+        [
+          {
+            "node": "5. JSON 排名结果",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "6. Markdown 决策报告",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Markdown 决策报告": {
+      "main": [
+        [
+          {
+            "node": "7. 显示结果给用户",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fb22f3db-3715-404e-9c4f-1f20346154d9",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}
