@@ -1,0 +1,15 @@
+{
+  "score_weights": {
+    "curiosity": 2,
+    "pain": 2,
+    "product_fit": 1,
+    "visual_potential": 1,
+    "repeatability": 1
+  },
+  "risk_penalty_weight": 2,
+  "recommendation_thresholds": {
+    "A": 25,
+    "B": 18
+  },
+  "risk_block_score": 5
+}
