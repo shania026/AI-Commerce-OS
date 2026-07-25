@@ -1,0 +1,844 @@
+{
+  "name": "AI Health OS Video Generator V1.0",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "video-trigger",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1000,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Entry point for AI Health OS Video Generator V1.0. Receives the complete Final Report JSON from an external caller without modifying the stable Master Orchestrator."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Parse the complete AI Health OS Final Report into one canonical object.\n// Supports objects, one-item arrays, JSON strings, Markdown-fenced JSON, and common n8n wrappers.\nconst input = $input.first()?.json || {};\nfunction stripFence(value) {\n  if (typeof value !== 'string') return value;\n  return value.trim().replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```$/i, '').trim();\n}\nfunction parseMaybe(value) {\n  const clean = stripFence(value);\n  return typeof clean === 'string' ? JSON.parse(clean) : clean;\n}\nfunction unwrap(value) {\n  let current = value;\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  if (current && typeof current === 'object' && current.json && Object.keys(current).length <= 3) current = current.json;\n  if (current && typeof current === 'object' && current.final_report_json !== undefined) current = current.final_report_json;\n  else if (current && typeof current === 'object' && current.final_report !== undefined) current = current.final_report;\n  else if (current && typeof current === 'object' && current.data && !current.agent_results) current = current.data;\n  else if (current && typeof current === 'object' && current.output && !current.agent_results) current = current.output;\n  current = parseMaybe(current);\n  if (Array.isArray(current) && current.length === 1) current = current[0];\n  if (current && typeof current === 'object' && current.json && Object.keys(current).length <= 3) current = current.json;\n  return current;\n}\ntry {\n  const source = input.final_report_json ?? input.final_report ?? input.payload ?? input;\n  const finalReport = unwrap(parseMaybe(source));\n  if (!finalReport || typeof finalReport !== 'object' || Array.isArray(finalReport)) throw new Error('Final Report must resolve to a JSON object.');\n  return [{ json: { parse_success: true, parse_error: '', requested_model: String(input.video_model || input.model || finalReport.video_model || 'veo_3'), final_report: finalReport, raw_input: input } }];\n} catch (error) {\n  return [{ json: { parse_success: false, parse_error: `Final Report JSON parse failed: ${error.message}`, requested_model: String(input.video_model || input.model || 'veo_3'), final_report: {}, raw_input: input } }];\n}\n"
+      },
+      "id": "parse-final",
+      "name": "Parse Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -840,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Parses object, array, string, Markdown JSON, and common n8n wrapper inputs into one Final Report object."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Validate the Master Final Report before any production prompts are generated.\n// Validation is non-destructive and reports every missing requirement in one response.\nconst data = $input.first()?.json || {};\nconst report = data.final_report || {};\nconst results = report.agent_results || {};\nconst a3 = results.agent_3 || report.agent_3_output || {};\nconst a4 = results.agent_4 || report.agent_4_output || {};\nconst a5 = results.agent_5 || report.agent_5_output || {};\nconst a6 = results.agent_6 || report.agent_6_output || {};\nfunction arrayAt(obj, keys) { for (const key of keys) if (Array.isArray(obj?.[key])) return obj[key]; return []; }\nfunction text(value) { return String(value ?? '').trim(); }\nconst scripts = arrayAt(a3, ['scripts', 'script_results', 'results', 'records']);\nconst plans = arrayAt(a4, ['visual_plans', 'visual_projects', 'results', 'records']);\nconst voiceovers = arrayAt(a5, ['voiceover_packages', 'results', 'records']);\nconst publishing = Array.isArray(report.final_publishing_packages) ? report.final_publishing_packages : arrayAt(a6, ['publishing_packages', 'results', 'records']);\nconst script = scripts[0] || {};\nconst plan = plans[0] || {};\nconst voiceover = voiceovers[0] || {};\nconst scenes = arrayAt(plan, ['scenes', 'scene_plan', 'shot_list', 'shots']);\nconst errors = [];\nconst warnings = [];\nif (!data.parse_success) errors.push(data.parse_error || 'Final Report could not be parsed.');\nif (text(report.status).toLowerCase() !== 'success') errors.push('Final Report status must be success.');\nif (!report.agent_results && !report.agent_3_output) errors.push('Preserved Agent outputs are missing.');\nif (!text(report.topic || script.topic || script.source_title)) errors.push('Topic is missing.');\nif (!text(report.product_name) && !text(publishing[0]?.product_name)) warnings.push('Product Name is empty; production can continue without product placement.');\nif (!text(script.video_title || publishing[0]?.video_title)) errors.push('Video Title is missing.');\nif (!text(script.hook)) errors.push('Hook is missing from Agent 3 output.');\nif (!text(script.full_script || script.body)) errors.push('Full Script or script body is missing from Agent 3 output.');\nif (!plans.length) errors.push('Agent 4 visual_plans[] is empty.');\nif (!scenes.length) errors.push('Scene Plan / Shot List is empty.');\nif (!text(voiceover.full_voiceover_script || voiceover.voiceover_script || voiceover.voiceover)) errors.push('Voiceover is missing from Agent 5 output.');\nif (!text(voiceover.srt) && !arrayAt(voiceover, ['subtitle_segments', 'subtitles']).length) errors.push('Subtitles and SRT are missing from Agent 5 output.');\nif (!publishing.length) errors.push('Publishing Package is missing from Agent 6 output.');\nreturn [{ json: { ...data, validation_passed: errors.length === 0, validation_errors: errors, validation_warnings: warnings, source_counts: { scripts: scripts.length, visual_plans: plans.length, scenes: scenes.length, voiceover_packages: voiceovers.length, publishing_packages: publishing.length } } }];\n"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Validates successful Master status and required Agent 3–6 production fields before prompt generation."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "input-valid-condition",
+              "leftValue": "={{ $json.validation_passed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "input-valid",
+      "name": "Input Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -520,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE continues to production extraction. FALSE stops safely and returns a structured validation error."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Return a structured error when Final Report parsing or required-field validation fails.\n// No prompts or files are generated on this branch.\nconst data = $input.first()?.json || {};\nreturn [{ json: { workflow: 'AI Health OS Video Generator', version: '1.0', status: 'error', failed_step: data.parse_success ? 'Validate Input' : 'Parse Final Report', parse_error: data.parse_error || '', validation_errors: data.validation_errors || [], validation_warnings: data.validation_warnings || [], suggested_action: 'Provide the complete successful AI Health OS Final Report JSON with preserved Agent 3–6 outputs.', raw_input: data.raw_input || {} } }];\n"
+      },
+      "id": "input-error",
+      "name": "Build Validation Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -360,
+        500
+      ],
+      "notesInFlow": true,
+      "notes": "Builds a structured parse/validation error; no prompts or files are generated."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Extract production fields from preserved Agent 3–6 outputs into a stable internal contract.\n// Agent outputs and Agent 6 publishing content are copied, never rewritten.\nconst data = $input.first()?.json || {};\nconst report = data.final_report || {};\nconst results = report.agent_results || {};\nconst a3 = results.agent_3 || report.agent_3_output || {};\nconst a4 = results.agent_4 || report.agent_4_output || {};\nconst a5 = results.agent_5 || report.agent_5_output || {};\nconst a6 = results.agent_6 || report.agent_6_output || {};\nfunction arrayAt(obj, keys) { for (const key of keys) if (Array.isArray(obj?.[key])) return obj[key]; return []; }\nfunction text(value) { return String(value ?? '').trim(); }\nconst script = arrayAt(a3, ['scripts', 'script_results', 'results', 'records'])[0] || {};\nconst visualPlan = arrayAt(a4, ['visual_plans', 'visual_projects', 'results', 'records'])[0] || {};\nconst voiceoverPackage = arrayAt(a5, ['voiceover_packages', 'results', 'records'])[0] || {};\nconst publishingPackage = (Array.isArray(report.final_publishing_packages) ? report.final_publishing_packages : arrayAt(a6, ['publishing_packages', 'results', 'records']))[0] || {};\nconst hook = text(script.hook);\nconst body = text(script.body || script.full_script || script.script);\nconst cta = text(script.cta);\nconst fullScript = text(script.full_script || [hook, body, cta].filter(Boolean).join(' '));\nconst scenePlan = arrayAt(visualPlan, ['scenes', 'scene_plan', 'shot_list', 'shots']);\nreturn [{ json: { ...data, production_input: { source_workflow: text(report.workflow || 'AI Health OS Master Orchestrator'), source_master_run_id: text(report.master_run_id), topic: text(report.topic || script.topic || script.source_title), product_name: text(report.product_name || publishingPackage.product_name), target_platform: text(report.target_platform), target_audience: text(report.target_audience), language: text(report.language || 'en-US'), brand_tone: text(report.brand_tone), video_duration_seconds: Number(report.video_duration_seconds || voiceoverPackage.estimated_duration_seconds || 30), video_title: text(script.video_title || publishingPackage.video_title), hook, full_script: fullScript, scene_plan: scenePlan, visual_plan: visualPlan, visual_prompts: arrayAt(visualPlan, ['visual_prompts', 'image_prompts', 'video_prompts']), voiceover: text(voiceoverPackage.full_voiceover_script || voiceoverPackage.voiceover_script || voiceoverPackage.voiceover), voiceover_segments: arrayAt(voiceoverPackage, ['voiceover_segments', 'narration_segments']), subtitles: arrayAt(voiceoverPackage, ['subtitle_segments', 'subtitles']), subtitles_srt: text(voiceoverPackage.srt), publishing_package: publishingPackage } } }];\n"
+      },
+      "id": "extract-inputs",
+      "name": "Extract Production Inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -360,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Extracts topic, product, script, visuals, voiceover, subtitles, SRT, and publishing data without changing upstream content."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Build a completely model-independent Canonical Scene Specification.\n// No provider names, provider parameters, or provider-specific syntax are introduced here.\nconst data = $input.first()?.json || {};\nconst input = data.production_input || {};\nfunction text(value) { return String(value ?? '').trim(); }\nfunction number(value, fallback) { const n = Number(value); return Number.isFinite(n) && n >= 0 ? n : fallback; }\nfunction array(value) { return Array.isArray(value) ? value : []; }\nconst rawScenes = array(input.scene_plan);\nconst defaultDuration = rawScenes.length ? number(input.video_duration_seconds, 30) / rawScenes.length : number(input.video_duration_seconds, 30);\nconst scenes = rawScenes.map((scene, index) => {\n  const camera = scene.camera && typeof scene.camera === 'object' ? scene.camera : {};\n  const start = number(scene.start_time_seconds ?? scene.start_time ?? scene.start, index * defaultDuration);\n  const duration = number(scene.duration_seconds ?? scene.duration, defaultDuration);\n  const visualPrompt = text(scene.visual_prompt || scene.image_prompt || scene.video_prompt || scene.visual_description || scene.description);\n  return {\n    scene_id: text(scene.scene_id || scene.shot_id || `scene_${String(index + 1).padStart(3, '0')}`),\n    scene_number: index + 1,\n    start_time_seconds: start,\n    duration_seconds: duration,\n    narration: text(scene.narration || scene.voiceover || input.voiceover_segments[index]?.voiceover_text),\n    subtitle: text(scene.subtitle || scene.subtitle_text || input.subtitles[index]?.text || input.subtitles[index]?.subtitle_text),\n    visual_goal: text(scene.visual_goal || scene.section || scene.purpose),\n    subject: text(scene.subject || 'the approved wellness subject'),\n    action: text(scene.action || scene.visual_action),\n    environment: text(scene.environment || scene.setting || scene.location),\n    camera: {\n      shot_type: text(camera.shot_type || scene.shot_type), angle: text(camera.angle || scene.camera_angle),\n      movement: text(camera.movement || scene.camera_movement), lens: text(camera.lens || scene.lens)\n    },\n    lighting: text(scene.lighting), color_palette: text(scene.color_palette || scene.colors),\n    composition: text(scene.composition || 'vertical 9:16 composition'),\n    continuity_notes: text(scene.continuity_notes || scene.continuity),\n    on_screen_text: text(scene.on_screen_text || scene.screen_text),\n    requires_image_prompt: Boolean(scene.requires_image_prompt || scene.image_prompt || scene.reference_image_required),\n    source_visual_prompt: visualPrompt,\n    negative_constraints: array(scene.negative_constraints || scene.negative_prompt)\n  };\n});\nreturn [{ json: { ...data, canonical_scene_specification_version: '1.0', canonical_scenes: scenes } }];\n"
+      },
+      "id": "canonical-scenes",
+      "name": "Build Canonical Scene Specifications",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Creates the model-independent Canonical Scene Specification consumed by every video model adapter."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Generate provider-neutral cinematic prompts from canonical scenes.\n// These prompts describe creative intent only; model adapters translate them into provider formats.\nconst data = $input.first()?.json || {};\nconst input = data.production_input || {};\nfunction text(value, fallback = '') { const v = String(value ?? '').trim(); return v || fallback; }\nconst scenes = (data.canonical_scenes || []).map((scene) => {\n  const camera = scene.camera || {};\n  const parts = [\n    `Scene ${scene.scene_number}, ${scene.duration_seconds} seconds, vertical 9:16 cinematic short-form video`,\n    `${text(scene.subject, 'Approved wellness subject')} ${text(scene.action, 'shown naturally')}`,\n    `environment: ${text(scene.environment, 'authentic calm wellness setting')}`,\n    `visual intent: ${text(scene.visual_goal || scene.source_visual_prompt, 'clear educational lifestyle storytelling')}`,\n    `camera: ${text(camera.shot_type, 'cinematic medium shot')}, ${text(camera.angle, 'natural eye-level angle')}, ${text(camera.movement, 'smooth controlled movement')}, ${text(camera.lens, 'natural cinematic depth of field')}`,\n    `lighting: ${text(scene.lighting, 'soft motivated natural light')}`,\n    `color palette: ${text(scene.color_palette, 'warm, calm, trustworthy natural tones')}`,\n    `composition: ${text(scene.composition, 'clean vertical composition with mobile-safe framing')}`,\n    `continuity: ${text(scene.continuity_notes, 'preserve subject, product, wardrobe, lighting, and spatial continuity')}`,\n    scene.on_screen_text ? `reserve clean space for later overlay text: ${scene.on_screen_text}; do not render letters in generated footage` : 'do not render text in generated footage',\n    'photorealistic details, believable motion, stable anatomy, coherent objects, polished commercial production quality',\n    'educational wellness context only; no medical outcomes, treatment imagery, logos, or watermark'\n  ];\n  const negative = ['medical procedure imagery', 'disease-treatment claims', 'guaranteed outcomes', 'warped anatomy', 'extra fingers', 'duplicate objects', 'flicker', 'unreadable text', 'logos', 'watermark', ...(scene.negative_constraints || [])];\n  return { ...scene, canonical_cinematic_prompt: parts.join('. ') + '.', canonical_negative_prompt: Array.from(new Set(negative.map(String))).join(', ') };\n});\nreturn [{ json: { ...data, canonical_scenes: scenes, canonical_prompt_count: scenes.length } }];\n"
+      },
+      "id": "cinematic-prompts",
+      "name": "Generate Canonical Cinematic Prompts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Creates one provider-neutral high-quality cinematic prompt per canonical scene."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Normalize the requested provider and expose one routing value for the Model Adapter Layer.\n// Upstream canonical scenes remain unchanged regardless of the selected provider.\nconst data = $input.first()?.json || {};\nconst raw = String(data.requested_model || 'veo_3').trim().toLowerCase().replace(/[\\s-]+/g, '_');\nconst aliases = { veo: 'veo_3', veo3: 'veo_3', google_veo_3: 'veo_3', runwayml: 'runway', runway_gen4: 'runway', kling_ai: 'kling', hailuo_ai: 'hailuo' };\nconst selected = aliases[raw] || raw;\nconst supported = ['veo_3', 'runway', 'kling', 'hailuo'];\nreturn [{ json: { ...data, selected_model: selected, adapter_supported: supported.includes(selected), available_adapters: supported } }];\n"
+      },
+      "id": "model-router",
+      "name": "Model Adapter Layer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Normalizes provider selection and routes canonical scenes to an isolated model-specific adapter."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-veo-condition",
+              "leftValue": "={{ $json.selected_model === \"veo_3\" }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-veo",
+      "name": "Use Veo 3 Adapter?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        280,
+        -300
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE selects Veo 3. FALSE checks the next installed model adapter."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Translate canonical scenes into Veo 3 prompt objects only.\n// This adapter may be replaced without changing parsing, canonical scenes, QA, or exports.\nconst data = $input.first()?.json || {};\nconst prompts = (data.canonical_scenes || []).map((s) => ({ provider: 'veo_3', scene_id: s.scene_id, prompt: `${s.canonical_cinematic_prompt} Include synchronized natural ambient audio appropriate to the scene; no generated dialogue unless narration is explicitly requested.`, duration_seconds: s.duration_seconds, aspect_ratio: '9:16', audio_guidance: 'Natural scene ambience; voiceover is added in post-production.', negative_prompt: s.canonical_negative_prompt, canonical_prompt: s.canonical_cinematic_prompt }));\nreturn [{ json: { ...data, model_adapter: 'veo_3', video_prompts: prompts } }];\n"
+      },
+      "id": "veo-adapter",
+      "name": "Veo 3 Adapter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        -300
+      ],
+      "notesInFlow": true,
+      "notes": "Translates canonical scenes into Veo 3 prompt format only; no upstream fields depend on Veo 3."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-runway-condition",
+              "leftValue": "={{ $json.selected_model === \"runway\" }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-runway",
+      "name": "Use Runway Adapter?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        280,
+        -100
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE selects Runway. FALSE checks the next installed model adapter."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Translate canonical scenes into Runway-oriented prompt objects only.\n// Canonical creative intent is preserved while provider controls stay isolated here.\nconst data = $input.first()?.json || {};\nconst prompts = (data.canonical_scenes || []).map((s) => ({ provider: 'runway', scene_id: s.scene_id, text_prompt: s.canonical_cinematic_prompt, duration_seconds: s.duration_seconds, ratio: '9:16', camera_control: s.camera?.movement || '', reference_mode: s.requires_image_prompt ? 'image_to_video' : 'text_to_video', negative_prompt: s.canonical_negative_prompt, canonical_prompt: s.canonical_cinematic_prompt }));\nreturn [{ json: { ...data, model_adapter: 'runway', video_prompts: prompts } }];\n"
+      },
+      "id": "runway-adapter",
+      "name": "Runway Adapter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        -100
+      ],
+      "notesInFlow": true,
+      "notes": "Translates canonical scenes into Runway prompt format only."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-kling-condition",
+              "leftValue": "={{ $json.selected_model === \"kling\" }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-kling",
+      "name": "Use Kling Adapter?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        280,
+        100
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE selects Kling. FALSE checks the next installed model adapter."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Translate canonical scenes into Kling-oriented prompt objects only.\n// No upstream extraction or canonical scene field depends on Kling.\nconst data = $input.first()?.json || {};\nconst prompts = (data.canonical_scenes || []).map((s) => ({ provider: 'kling', scene_id: s.scene_id, positive_prompt: s.canonical_cinematic_prompt, negative_prompt: s.canonical_negative_prompt, duration_seconds: s.duration_seconds, aspect_ratio: '9:16', motion_guidance: s.camera?.movement || 'smooth natural motion', creativity_mode: 'balanced', canonical_prompt: s.canonical_cinematic_prompt }));\nreturn [{ json: { ...data, model_adapter: 'kling', video_prompts: prompts } }];\n"
+      },
+      "id": "kling-adapter",
+      "name": "Kling Adapter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        100
+      ],
+      "notesInFlow": true,
+      "notes": "Translates canonical scenes into Kling prompt format only."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-hailuo-condition",
+              "leftValue": "={{ $json.selected_model === \"hailuo\" }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-hailuo",
+      "name": "Use Hailuo Adapter?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        280,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE selects Hailuo. FALSE returns an unsupported-adapter error."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Translate canonical scenes into Hailuo-oriented prompt objects only.\n// Provider-specific motion and framing instructions are confined to this adapter.\nconst data = $input.first()?.json || {};\nconst prompts = (data.canonical_scenes || []).map((s) => ({ provider: 'hailuo', scene_id: s.scene_id, prompt: s.canonical_cinematic_prompt, negative_prompt: s.canonical_negative_prompt, duration_seconds: s.duration_seconds, aspect_ratio: '9:16', motion: s.camera?.movement || 'stable cinematic movement', first_frame_reference_recommended: Boolean(s.requires_image_prompt), canonical_prompt: s.canonical_cinematic_prompt }));\nreturn [{ json: { ...data, model_adapter: 'hailuo', video_prompts: prompts } }];\n"
+      },
+      "id": "hailuo-adapter",
+      "name": "Hailuo Adapter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Translates canonical scenes into Hailuo prompt format only."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Fail safely when no installed Model Adapter matches the requested provider.\n// The response lists supported adapters and does not generate partial files.\nconst data = $input.first()?.json || {};\nreturn [{ json: { workflow: 'AI Health OS Video Generator', version: '1.0', status: 'error', failed_step: 'Model Adapter Layer', requested_model: data.selected_model || data.requested_model || '', available_adapters: data.available_adapters || ['veo_3', 'runway', 'kling', 'hailuo'], error_message: 'No installed Model Adapter matches the requested video model.', suggested_action: 'Choose a supported adapter or add a new isolated adapter node that consumes the Canonical Scene Specification.' } }];\n"
+      },
+      "id": "adapter-error",
+      "name": "Build Model Adapter Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        500
+      ],
+      "notesInFlow": true,
+      "notes": "Stops safely when the requested provider has no installed adapter and lists supported choices."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Build optional model-independent still-image/reference-frame prompts for each scene.\n// Image prompts remain separate from video-provider adapters and preserve scene alignment.\nconst data = $input.first()?.json || {};\nconst prompts = (data.canonical_scenes || []).map((s) => ({ scene_id: s.scene_id, required: Boolean(s.requires_image_prompt), purpose: s.requires_image_prompt ? 'reference_frame_or_image_to_video_input' : 'not_required', image_prompt: s.requires_image_prompt ? `${s.canonical_cinematic_prompt} Render a single decisive still frame with no motion blur and no text.` : '', negative_prompt: s.requires_image_prompt ? s.canonical_negative_prompt : '', aspect_ratio: '9:16', continuity_reference: s.continuity_notes || '' }));\nreturn [{ json: { ...data, image_prompts: prompts } }];\n"
+      },
+      "id": "image-adapter",
+      "name": "Generate Image Prompts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Builds optional model-independent reference-image prompts while preserving scene alignment."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Run production QA after the selected model adapter and image prompt stage.\n// QA blocks exports if scenes, prompts, voiceover, SRT, or publishing data are incomplete.\nconst data = $input.first()?.json || {};\nconst input = data.production_input || {};\nconst scenes = Array.isArray(data.canonical_scenes) ? data.canonical_scenes : [];\nconst videoPrompts = Array.isArray(data.video_prompts) ? data.video_prompts : [];\nconst imagePrompts = Array.isArray(data.image_prompts) ? data.image_prompts : [];\nconst issues = [];\nconst warnings = [...(data.validation_warnings || [])];\nif (!scenes.length) issues.push('No canonical scenes were generated.');\nif (videoPrompts.length !== scenes.length) issues.push('Every canonical scene must have exactly one model-adapted video prompt.');\nif (imagePrompts.length !== scenes.length) issues.push('Image prompt alignment does not match canonical scenes.');\nif (new Set(scenes.map((s) => s.scene_id)).size !== scenes.length) issues.push('Canonical scene IDs must be unique.');\nif (videoPrompts.some((p) => !String(p.prompt || p.text_prompt || p.positive_prompt || '').trim())) issues.push('One or more model prompts are empty.');\nif (!String(input.voiceover || '').trim()) issues.push('Voiceover is empty.');\nif (!String(input.subtitles_srt || '').includes('-->')) issues.push('SRT is missing or has no timestamp arrow.');\nif (!input.publishing_package || !Object.keys(input.publishing_package).length) issues.push('Publishing package is empty.');\nconst qaScore = Math.max(0, 100 - issues.length * 20 - warnings.length * 2);\nreturn [{ json: { ...data, production_qa: { passed: issues.length === 0, score: qaScore, issues, warnings }, qa_passed: issues.length === 0 } }];\n"
+      },
+      "id": "production-qa",
+      "name": "Production Package QA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Checks scene coverage, adapter output, voiceover, SRT, publishing data, and file readiness."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "qa-passed-condition",
+              "leftValue": "={{ $json.qa_passed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "qa-passed",
+      "name": "Production QA Passed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE builds exports. FALSE returns a structured production QA error."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Return a structured production QA failure without exporting misleading artifacts.\n// Partial canonical data is retained only for diagnosis.\nconst data = $input.first()?.json || {};\nreturn [{ json: { workflow: 'AI Health OS Video Generator', version: '1.0', status: 'error', failed_step: 'Production Package QA', model_adapter: data.model_adapter || data.selected_model || '', qa: data.production_qa || {}, error_message: 'Production package did not pass QA.', suggested_action: 'Review QA issues and the source Agent 3–6 outputs, then rerun with the complete Final Report.', partial_scene_count: (data.canonical_scenes || []).length } }];\n"
+      },
+      "id": "production-error",
+      "name": "Build Production Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ],
+      "notesInFlow": true,
+      "notes": "Returns QA issues and diagnostic counts without generating files."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Assemble the complete production package after QA passes.\n// Agent 6 publishing content is preserved exactly and no external generation service is called.\nconst data = $input.first()?.json || {};\nconst input = data.production_input || {};\nconst generatedAt = new Date().toISOString();\nconst packageData = { workflow: 'AI Health OS Video Generator', version: '1.0', status: 'success', source_workflow: input.source_workflow, source_master_run_id: input.source_master_run_id, model_adapter: data.model_adapter, topic: input.topic, product_name: input.product_name, video_title: input.video_title, hook: input.hook, full_script: input.full_script, canonical_scene_specification_version: data.canonical_scene_specification_version, scenes: data.canonical_scenes || [], video_prompts: data.video_prompts || [], image_prompts: data.image_prompts || [], voiceover: input.voiceover, voiceover_segments: input.voiceover_segments || [], subtitles: input.subtitles || [], subtitles_srt: input.subtitles_srt, publishing_package: input.publishing_package, qa: data.production_qa, generated_at: generatedAt, ready_for_manual_generation: true, disclaimer: 'This workflow prepares prompts and production files only. It does not generate media, call external model APIs, upload content, or publish automatically. Human review is required.' };\nreturn [{ json: { ...data, production_package: packageData } }];\n"
+      },
+      "id": "build-package",
+      "name": "Build Complete Production Package",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Assembles canonical scenes, selected adapter prompts, image prompts, voiceover, subtitles, publishing package, and QA."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Export the approved package as five named downloadable n8n binary artifacts.\n// Files are created in memory; this node does not write to the host filesystem or call external APIs.\nconst data = $input.first()?.json || {};\nconst p = data.production_package || {};\nfunction pretty(value) { return JSON.stringify(value, null, 2); }\nfunction binaryFile(content, fileName, mimeType) { return { data: Buffer.from(String(content ?? ''), 'utf8').toString('base64'), mimeType, fileName, fileExtension: fileName.split('.').pop() }; }\nconst videoJson = pretty({ workflow: p.workflow, version: p.version, model_adapter: p.model_adapter, source_master_run_id: p.source_master_run_id, video_title: p.video_title, canonical_scene_specification_version: p.canonical_scene_specification_version, video_prompts: p.video_prompts });\nconst imageJson = pretty({ workflow: p.workflow, version: p.version, source_master_run_id: p.source_master_run_id, video_title: p.video_title, image_prompts: p.image_prompts });\nconst voiceoverText = [`Title: ${p.video_title || ''}`, '', p.voiceover || '', '', 'Voiceover Segments', ...(p.voiceover_segments || []).map((s) => `${s.segment_number || ''} [${s.start_time_seconds ?? ''}-${s.end_time_seconds ?? ''}s] ${s.voiceover_text || s.text || ''}`)].join('\\n');\nconst md = ['# AI Health OS Video Production Package', '', `- Status: ${p.status}`, `- Model Adapter: ${p.model_adapter}`, `- Source Master Run ID: ${p.source_master_run_id || ''}`, `- Topic: ${p.topic || ''}`, `- Product: ${p.product_name || ''}`, `- Video Title: ${p.video_title || ''}`, `- QA Score: ${p.qa?.score ?? ''}`, '', '## Hook', '', p.hook || '', '', '## Full Script', '', p.full_script || '', '', '## Scene Production Plan', '', ...(p.scenes || []).flatMap((s) => [`### Scene ${s.scene_number}: ${s.scene_id}`, '', `- Duration: ${s.duration_seconds}s`, `- Subject: ${s.subject}`, `- Action: ${s.action}`, `- Environment: ${s.environment}`, `- Camera: ${s.camera?.shot_type || ''}; ${s.camera?.angle || ''}; ${s.camera?.movement || ''}`, `- Canonical Prompt: ${s.canonical_cinematic_prompt}`, `- Negative Prompt: ${s.canonical_negative_prompt}`, '']), '## Model-Adapted Video Prompts', '', '```json', pretty(p.video_prompts || []), '```', '', '## Image Prompts', '', '```json', pretty(p.image_prompts || []), '```', '', '## Publishing Package', '', '```json', pretty(p.publishing_package || {}), '```', '', '## QA', '', '```json', pretty(p.qa || {}), '```', '', '## Safety Boundary', '', p.disclaimer || ''].join('\\n');\nconst binary = { video_prompts: binaryFile(videoJson, 'video_prompts.json', 'application/json'), image_prompts: binaryFile(imageJson, 'image_prompts.json', 'application/json'), voiceover: binaryFile(voiceoverText, 'voiceover.txt', 'text/plain'), subtitles: binaryFile(p.subtitles_srt || '', 'subtitles.srt', 'application/x-subrip'), production_package: binaryFile(md, 'production_package.md', 'text/markdown') };\nreturn [{ json: { ...p, files: ['video_prompts.json', 'image_prompts.json', 'voiceover.txt', 'subtitles.srt', 'production_package.md'], file_count: 5 }, binary }];\n"
+      },
+      "id": "export-files",
+      "name": "Export Production Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Creates video_prompts.json, image_prompts.json, voiceover.txt, subtitles.srt, and production_package.md in memory."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Return the final production package summary and all five binary files to the caller.\n// The successful result is ready for human-reviewed generation, not automatic media production.\nconst item = $input.first() || { json: {}, binary: {} };\nconst data = item.json || {};\nreturn [{ json: { ...data, total_scenes: (data.scenes || []).length, video_prompt_count: (data.video_prompts || []).length, image_prompt_count: (data.image_prompts || []).filter((p) => p.required).length, qa_passed: Boolean(data.qa?.passed), ready_for_manual_generation: Boolean(data.ready_for_manual_generation), files: data.files || [] }, binary: item.binary || {} }];\n"
+      },
+      "id": "success-output",
+      "name": "AI Health OS Video Generator Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Returns the successful package summary and all five downloadable binary artifacts to the caller."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Purpose: Return one consistent error contract for validation, adapter, and production QA failures.\n// Error output never claims generation readiness and contains no generated files.\nconst data = $input.first()?.json || {};\nreturn [{ json: { ...data, status: 'error', ready_for_manual_generation: false, files: [] } }];\n"
+      },
+      "id": "error-output",
+      "name": "AI Health OS Video Generator Error Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        500
+      ],
+      "notesInFlow": true,
+      "notes": "Provides one consistent terminal error response for every failure path."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Parse Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Final Report": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Input Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input Valid?": {
+      "main": [
+        [
+          {
+            "node": "Extract Production Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Validation Error": {
+      "main": [
+        [
+          {
+            "node": "AI Health OS Video Generator Error Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Production Inputs": {
+      "main": [
+        [
+          {
+            "node": "Build Canonical Scene Specifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Canonical Scene Specifications": {
+      "main": [
+        [
+          {
+            "node": "Generate Canonical Cinematic Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Canonical Cinematic Prompts": {
+      "main": [
+        [
+          {
+            "node": "Model Adapter Layer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Model Adapter Layer": {
+      "main": [
+        [
+          {
+            "node": "Use Veo 3 Adapter?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Veo 3 Adapter?": {
+      "main": [
+        [
+          {
+            "node": "Veo 3 Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use Runway Adapter?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Runway Adapter?": {
+      "main": [
+        [
+          {
+            "node": "Runway Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use Kling Adapter?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Kling Adapter?": {
+      "main": [
+        [
+          {
+            "node": "Kling Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use Hailuo Adapter?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Hailuo Adapter?": {
+      "main": [
+        [
+          {
+            "node": "Hailuo Adapter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Model Adapter Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Veo 3 Adapter": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runway Adapter": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kling Adapter": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hailuo Adapter": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Model Adapter Error": {
+      "main": [
+        [
+          {
+            "node": "AI Health OS Video Generator Error Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image Prompts": {
+      "main": [
+        [
+          {
+            "node": "Production Package QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Production Package QA": {
+      "main": [
+        [
+          {
+            "node": "Production QA Passed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Production QA Passed?": {
+      "main": [
+        [
+          {
+            "node": "Build Complete Production Package",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Production Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Production Error": {
+      "main": [
+        [
+          {
+            "node": "AI Health OS Video Generator Error Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Complete Production Package": {
+      "main": [
+        [
+          {
+            "node": "Export Production Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Production Files": {
+      "main": [
+        [
+          {
+            "node": "AI Health OS Video Generator Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ai-health-os-video-generator-v1-0",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "AI Health OS"
+    },
+    {
+      "name": "Video Generator"
+    },
+    {
+      "name": "V1.0"
+    }
+  ],
+  "id": "ai-health-os-video-generator-v1-0"
+}
